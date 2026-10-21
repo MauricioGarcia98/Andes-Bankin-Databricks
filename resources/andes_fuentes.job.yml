@@ -1,0 +1,44 @@
+# Job "fuentes": simula los sistemas origen del banco. No es parte del lakehouse: es el "mundo exterior".
+# genera la verdad → la exporta sucia → la sube a Azure (y en paralelo copia el BCRA real al espejo).
+resources:
+  jobs:
+    andes_fuentes:
+      name: andes-bank-fuentes
+      description: Simula los sistemas origen de Andes Bank (core, procesador de tarjetas) y los sube a Azure
+      max_concurrent_runs: 1
+      timeout_seconds: 10800
+      tags:
+        project: andes-bank
+        layer: sources
+      parameters:
+        - name: catalog
+          default: ${var.catalog}
+        - name: scale_factor
+          default: ${var.scale_factor}
+        - name: start_date
+          default: ${var.start_date}
+        - name: end_date
+          default: ${var.end_date}
+      tasks:
+        - task_key: setup
+          notebook_task:
+            notebook_path: ../notebooks/00_setup.py
+        - task_key: generate_truth
+          depends_on: [{ task_key: setup }]
+          notebook_task:
+            notebook_path: ../notebooks/01_generate_truth.py
+        - task_key: export_sources
+          depends_on: [{ task_key: generate_truth }]
+          notebook_task:
+            notebook_path: ../notebooks/02_export_sources.py
+        - task_key: upload_to_azure
+          depends_on: [{ task_key: export_sources }]
+          max_retries: 1
+          notebook_task:
+            notebook_path: ../notebooks/03_upload_to_azure.py
+        - task_key: fx_mirror
+          depends_on: [{ task_key: setup }]
+          max_retries: 2
+          min_retry_interval_millis: 60000
+          notebook_task:
+            notebook_path: ../notebooks/04_fx_mirror.py

@@ -200,6 +200,40 @@ def write_accounts(spark: SparkSession, cfg: ProjectConfig) -> str:
     return path
 
 
+# -------------------------------------------------------------------------------------- core: tarjetas
+def write_cards(spark: SparkSession, cfg: ProjectConfig) -> str:
+    """Maestro de tarjetas del core: une el token que conoce el procesador con el cliente y la cuenta."""
+    c = (spark.table(cfg.table("sim", "cards"))
+         .join(spark.table(cfg.table("sim", "customers")).select("customer_key", "customer_id"), "customer_key")
+         .join(spark.table(cfg.table("sim", "accounts")).select(F.col("account_key").alias("ca_ars_account_key"),
+                                                                 F.col("account_id")), "ca_ars_account_key"))
+    start, mig = _d(cfg.start_date), _d(ref.CORE_MIGRATION_DATE)
+    alive_at = lambda d: (F.col("issued_date") <= d) & (F.col("closed_date").isNull() | (F.col("closed_date") > d))  # noqa: E731
+    df = (
+        c.where(alive_at(start)).withColumn("delivery_date", start).withColumn("op", F.lit("I"))
+        .unionByName(c.where(F.col("issued_date") > start).withColumn("delivery_date", F.col("issued_date")).withColumn("op", F.lit("I")))
+        .unionByName(c.where(F.col("closed_date").isNotNull() & (F.col("closed_date") > start))
+                     .withColumn("delivery_date", F.col("closed_date")).withColumn("op", F.lit("D")))
+        .unionByName(c.where(alive_at(mig)).withColumn("delivery_date", mig).withColumn("op", F.lit("I")))
+        .where(F.col("delivery_date") <= _d(cfg.end_date))
+    )
+    legacy = [
+        F.col("op").alias("OPERACION"), F.col("card_token").alias("TOKEN_TARJETA"), F.col("customer_id").alias("NRO_CLIENTE"),
+        F.col("account_id").alias("NRO_CUENTA"), F.col("card_type").alias("TIPO"), F.col("brand").alias("MARCA"),
+        F.col("pan_last4").alias("ULTIMOS4"), F.date_format("issued_date", "dd/MM/yyyy").alias("FEC_EMISION"),
+        _ar_number(F.col("credit_limit_2023").cast("double")).alias("LIMITE"),
+    ]
+    new = [
+        F.col("op"), F.col("card_token").alias("token_tarjeta"), F.col("customer_id").alias("cliente_id"),
+        F.col("account_id").alias("cuenta_id"), F.col("card_type").alias("tipo"), F.col("brand").alias("marca"),
+        F.col("pan_last4").alias("ultimos4"), F.col("issued_date").cast("string").alias("fecha_emision"),
+        F.col("credit_limit_2023").cast("decimal(18,2)").alias("limite"),
+    ]
+    path = cfg.staging_path("core/tarjetas")
+    _split_write(df, path, legacy, new)
+    return path
+
+
 # ---------------------------------------------------------------------------------- core: movimientos
 def transaction_export(txn: DataFrame, cfg: ProjectConfig) -> DataFrame:
     """Movimientos tal como los entrega el core: con duplicados, faltantes, moneda mal y un día que llega tarde."""
@@ -330,6 +364,7 @@ def export_all(spark: SparkSession, cfg: ProjectConfig) -> dict[str, str]:
     paths = {
         "core/clientes": write_customers(spark, cfg),
         "core/cuentas": write_accounts(spark, cfg),
+        "core/tarjetas": write_cards(spark, cfg),
         "core/movimientos": write_transactions(spark, cfg),
         "core/saldos": write_balances(spark, cfg),
     }

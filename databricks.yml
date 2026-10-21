@@ -1,0 +1,37 @@
+# =============================================================================
+# Databricks Asset Bundle de Andes Bank: todo lo de Databricks como código.
+#
+#   0) UNA SOLA VEZ, en el SQL Editor (Free Edition no deja crear catálogos por API):
+#        CREATE CATALOG IF NOT EXISTS andes_bank COMMENT 'Andes Bank: lakehouse bancario E2E';
+#   1) databricks bundle validate
+#   2) databricks bundle deploy -t dev
+#   3) databricks bundle run andes_fuentes -t dev     # simula los sistemas origen y los sube a Azure
+#
+# El host del workspace se toma de DATABRICKS_HOST o de ~/.databrickscfg.
+# =============================================================================
+bundle:
+  name: andes-bank
+
+include:
+  - resources/*.yml
+
+variables:
+  catalog:
+    description: Catálogo de Unity Catalog del proyecto (se crea a mano por SQL)
+    default: andes_bank
+  scale_factor:
+    description: "Clientes: 0.1 (50 mil, ~17 M movimientos, Free Edition), 1 (500 mil, ~170 M movimientos)"
+    default: "0.1"
+  start_date:
+    default: "2023-01-01"
+  end_date:
+    default: "2026-10-20"
+  warehouse_id:
+    description: SQL warehouse para dashboards, metric views y Genie
+    lookup:
+      warehouse: Serverless Starter Warehouse
+
+targets:
+  dev:
+    mode: development       # prefija los recursos con [dev <usuario>] y pausa los schedules
+    default: true
