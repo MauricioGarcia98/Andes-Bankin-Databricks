@@ -1,7 +1,6 @@
 # 00 · Definición del proyecto
 
-> **Estado:** borrador para revisar. Nada de esto está construido todavía. Cuando lo apruebes, este documento pasa a
-> ser el "contrato" del proyecto y cualquier cambio se registra como ADR en `docs/adr/`.
+> **Estado:** aprobado. Este documento es el "contrato" del proyecto; cualquier cambio se registra como ADR en `docs/adr/`.
 
 ## En una frase
 
@@ -56,6 +55,7 @@ Inversiones (plazos fijos, FCI).
 | Idioma | castellano rioplatense, igual que Andes Viento Austral | coherencia con el proyecto anterior |
 | Estructura del repo | la misma que Viento Austral: `docs/`, `construir/` por etapas con tags, `genie/agents` | ya probada; el curso se puede seguir igual |
 | Escala | `scale_factor` (SF): 0,1 por defecto, 1 para la prueba de volumen | Free Edition tiene cuota diaria de cómputo |
+| Forma de trabajo | **Claude Code construye el proyecto completo y funcionando** (referencia), con un commit y un tag `etapa-NN` por etapa en la rama `curso`. Después **lo borrás entero** (Databricks, Azure, Salesforce y repo) y **lo volvés a construir solo** siguiendo `construir/` | igual que Andes Viento Austral: primero ves el resultado andando, después lo hacés vos; los tags son tu punto de control |
 
 ## Cómo se trabaja con la IA (regla del proyecto)
 
@@ -76,8 +76,11 @@ Claude Code **acompaña**, no reemplaza:
 4. Todo se despliega con `databricks bundle deploy` y la infraestructura de Azure con un script de `az`.
 5. El gasto de Azure del mes queda por debajo de USD 10.
 
-## Lo que falta definir (lo charlamos antes de construir)
+6. Existe `construir/01_borrar_todo.md` con el orden para desmontar todo (Databricks, Azure, Salesforce, GitHub) sin
+   perder la referencia, y `construir/` cubre cada etapa para rehacerlo sin IA.
 
-- Los volúmenes exactos a SF 1 (propuesta en [02](02_fuentes_mvp.md)).
-- Qué problemas del catálogo se activan en el MVP y cuáles se dejan para "modo difícil".
-- Si la App propia entra en el MVP o queda como extra (propuesta en [05](05_genie.md#la-app-para-qué-sirve)).
+## Estado
+
+Definición **aprobada** (21-oct-2026): volúmenes de [02](02_fuentes_mvp.md), perfil `normal` del
+[catálogo](03_catalogo_de_problemas.md) para el MVP y la App como extra después del MVP
+([05](05_genie.md#la-app-para-qué-sirve)).
