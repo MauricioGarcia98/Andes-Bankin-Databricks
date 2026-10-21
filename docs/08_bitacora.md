@@ -16,6 +16,7 @@
 | R09 | 11 | En el test local faltaban ~20 mil autorizaciones de la API | En Spark OSS el formato por defecto de `saveAsTable` es **Parquet** (en Databricks, Delta): las tablas locales eran Parquet y `replaceWhere` (opción de Delta) se ignoraba en silencio, así que cada lote de días pisaba la tabla entera | `spark.sql.sources.default=delta` en la sesión local y `df.writeTo(t).overwrite(condición)` (`utils.delta.replace_where`), explícito y sin depender del formato por defecto. Lección: el entorno local tiene que parecerse a Databricks en lo que importa |
 | R11 | 17 | `governance_semantic` falló: tabla `ops.dq_results` no encontrada | Una vista semántica leía una tabla de `ops` que crea una tarea POSTERIOR (el quality gate) | `setup` crea vacías todas las tablas de `ops`: el orden de las tareas deja de importar |
 | R12 | 17 | Segunda corrida del gobierno: `Cannot delete constraint pk_dim_fecha with non empty child constraints` | Las FK dependen de la PK; sin reconstruir gold, la PK vieja sigue ahí | `DROP CONSTRAINT IF EXISTS pk_... CASCADE`: el gobierno es idempotente |
+| R13 | 17 | `CREATE FUNCTION fn_posicion_dolares`: `UNRESOLVED_COLUMN al_dia` | El parámetro de una función SQL no se resuelve dentro de una subconsulta escalar del `WHERE` | Tabla derivada con `dense_rank() OVER (ORDER BY fecha DESC)` y `WHERE r = 1` |
 | R10 | 18 | (heredada de Viento Austral) Genie rechaza TODAS las preguntas de un agent | Una función certificada con parámetros `DATE` | Parámetros de fecha como `STRING 'yyyy-MM-dd'` |
 
 ## Cómo se encontraron

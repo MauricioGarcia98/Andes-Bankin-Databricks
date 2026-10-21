@@ -30,11 +30,14 @@ RETURN SELECT a.token_tarjeta, a.cliente_id, a.fecha, CAST(count(*) AS INT),
 CREATE OR REPLACE FUNCTION ${semantic}.fn_posicion_dolares(al_dia STRING)
 RETURNS TABLE (fecha DATE, cuentas BIGINT, depositos_usd DECIMAL(38,2), usd_oficial DECIMAL(18,4), valuacion_ars DECIMAL(38,2))
 COMMENT 'Depósitos en dólares al último fin de mes anterior o igual a la fecha, valuados al oficial. Uso: SELECT * FROM fn_posicion_dolares(''2025-06-30'')'
-RETURN SELECT s.fecha, count(*), CAST(sum(s.saldo) AS DECIMAL(38,2)), max(f.usd_oficial), CAST(sum(s.saldo_ars) AS DECIMAL(38,2))
-       FROM ${gold}.fact_saldo_diario s JOIN ${gold}.dim_fecha f ON f.fecha = s.fecha
-       WHERE s.moneda = 'USD' AND s.es_fin_de_mes
-         AND s.fecha = (SELECT max(fecha) FROM ${gold}.fact_saldo_diario WHERE es_fin_de_mes AND fecha <= to_date(al_dia))
-       GROUP BY s.fecha;
+-- el parámetro no se puede usar dentro de una subconsulta escalar del WHERE (UNRESOLVED_COLUMN, bitácora R13):
+-- se elige el último fin de mes con dense_rank en una tabla derivada
+RETURN SELECT fecha, count(*), CAST(sum(saldo) AS DECIMAL(38,2)), max(usd_oficial), CAST(sum(saldo_ars) AS DECIMAL(38,2))
+       FROM (SELECT s.fecha, s.saldo, s.saldo_ars, f.usd_oficial, dense_rank() OVER (ORDER BY s.fecha DESC) AS r
+             FROM ${gold}.fact_saldo_diario s JOIN ${gold}.dim_fecha f ON f.fecha = s.fecha
+             WHERE s.moneda = 'USD' AND s.es_fin_de_mes AND s.fecha <= to_date(al_dia))
+       WHERE r = 1
+       GROUP BY fecha;
 
 CREATE OR REPLACE FUNCTION ${semantic}.fn_salud_ingesta(dias INT)
 RETURNS TABLE (recurso STRING, pedidos BIGINT, ok BIGINT, rate_limit BIGINT, token_vencido BIGINT, error_servidor BIGINT,
