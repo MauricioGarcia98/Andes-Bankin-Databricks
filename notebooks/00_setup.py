@@ -6,7 +6,8 @@
 # MAGIC ```sql
 # MAGIC CREATE CATALOG IF NOT EXISTS andes_bank COMMENT 'Andes Bank: lakehouse bancario E2E';
 # MAGIC ```
-# MAGIC Este notebook crea las capas `sim, landing, bronze, silver, gold, semantic, ops` y el volumen `landing.raw`.
+# MAGIC Este notebook crea las capas `sim, landing, bronze, silver, gold, semantic, ops` el volumen `landing.raw` y
+# MAGIC las tablas de `ops` vacías (para que las vistas y Genie las encuentren aunque la tarea que las llena no haya corrido).
 
 # COMMAND ----------
 
@@ -14,7 +15,8 @@
 
 # COMMAND ----------
 
-from andes_bank.setup import create_namespace
+from andes_bank.setup import create_namespace, create_ops_tables
 
 create_namespace(spark, cfg)
+print("tablas de ops creadas:", create_ops_tables(spark, cfg))
 display(spark.sql(f"SHOW SCHEMAS IN {cfg.catalog}"))
