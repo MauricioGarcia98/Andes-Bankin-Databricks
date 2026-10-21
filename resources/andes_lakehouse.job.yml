@@ -44,8 +44,14 @@ resources:
           min_retry_interval_millis: 300000
           notebook_task:
             notebook_path: ../notebooks/12_bronze_api.py
+        - task_key: bronze_fx
+          depends_on: [{ task_key: setup }]
+          max_retries: 2
+          min_retry_interval_millis: 120000
+          notebook_task:
+            notebook_path: ../notebooks/13_bronze_fx.py
         - task_key: silver
-          depends_on: [{ task_key: bronze_files }, { task_key: bronze_api }]
+          depends_on: [{ task_key: bronze_files }, { task_key: bronze_api }, { task_key: bronze_fx }]
           notebook_task:
             notebook_path: ../notebooks/20_silver.py
         - task_key: gold

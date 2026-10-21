@@ -360,14 +360,17 @@ def write_api_data(spark: SparkSession, cfg: ProjectConfig) -> dict[str, str]:
     return out
 
 
-def export_all(spark: SparkSession, cfg: ProjectConfig) -> dict[str, str]:
-    paths = {
-        "core/clientes": write_customers(spark, cfg),
-        "core/cuentas": write_accounts(spark, cfg),
-        "core/tarjetas": write_cards(spark, cfg),
-        "core/movimientos": write_transactions(spark, cfg),
-        "core/saldos": write_balances(spark, cfg),
-    }
-    paths.update({f"cards_legacy/{k}": v for k, v in write_cards_legacy(spark, cfg).items()})
-    paths.update({f"api_data/{k}": v for k, v in write_api_data(spark, cfg).items()})
+WRITERS = {
+    "core/clientes": write_customers, "core/cuentas": write_accounts, "core/tarjetas": write_cards,
+    "core/movimientos": write_transactions, "core/saldos": write_balances,
+}
+
+
+def export_all(spark: SparkSession, cfg: ProjectConfig, only: list[str] | None = None) -> dict[str, str]:
+    """Exporta todas las fuentes, o sólo las de `only` (ej. ["core/tarjetas"], ["cards_legacy"], ["api_data"])."""
+    paths = {name: fn(spark, cfg) for name, fn in WRITERS.items() if not only or name in only}
+    if not only or "cards_legacy" in only:
+        paths.update({f"cards_legacy/{k}": v for k, v in write_cards_legacy(spark, cfg).items()})
+    if not only or "api_data" in only:
+        paths.update({f"api_data/{k}": v for k, v in write_api_data(spark, cfg).items()})
     return paths

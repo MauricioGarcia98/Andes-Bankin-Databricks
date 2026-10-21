@@ -13,5 +13,7 @@
 
 from andes_bank.generator.exports import export_all
 
-for name, path in export_all(spark, cfg).items():
+dbutils.widgets.text("only_sources", "", "Sólo estas fuentes (ej. core/tarjetas; vacío = todas)")
+only = [x.strip() for x in dbutils.widgets.get("only_sources").split(",") if x.strip()] or None
+for name, path in export_all(spark, cfg, only).items():
     print(f"{name:28s} {path}")

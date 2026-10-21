@@ -121,7 +121,8 @@ def test_identidad_y_scd2(spark, lake):
 def test_tarjetas_v1_y_v2(spark, lake):
     cfg, _ = lake
     a = t(spark, cfg, "silver", "card_authorizations")
-    truth = t(spark, cfg, "sim", "authorizations")
+    # las que el procesador informa tarde y caen después del último día procesado todavía no llegaron (correcto)
+    truth = t(spark, cfg, "sim", "authorizations").where(F.col("processing_date") <= F.lit(cfg.end_date.isoformat()))
     assert a.count() == a.select("auth_id").distinct().count() == truth.count()               # API-05/09, ni una de más
     overlap = a.where(f"fecha_proceso BETWEEN '{ref.API_V2_LAUNCH}' AND '{ref.API_V1_LAST_EXPORT}'")
     assert overlap.where("version_api = 'v1'").count() == 0                                   # gana v2

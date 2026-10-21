@@ -19,6 +19,8 @@ resources:
           default: ${var.start_date}
         - name: end_date
           default: ${var.end_date}
+        - name: only_sources
+          default: ""
       tasks:
         - task_key: setup
           notebook_task:

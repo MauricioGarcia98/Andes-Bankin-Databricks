@@ -1,6 +1,6 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # 12 · Bronze de APIs: tarjetas (v2) y cotizaciones (BCRA real + espejo)
+# MAGIC # 12 · Bronze de la API de tarjetas (v2)
 # MAGIC
 # MAGIC El cliente robusto (`andes_bank.ingestion.api_client`) recorre cada día desde el watermark, sobrevive al caos de la
 # MAGIC API y concilia contra los totales. Cada pedido queda en `ops.api_calls`; cada día, en `ops.api_reconciliation`.
@@ -26,9 +26,6 @@ client = ApiClient(sec("card_api_base_url"), sec("card_api_client_id"), sec("car
 for resource in ("authorizations", "settlements"):
     print(bronze_api.ingest_cards_api(spark, cfg, client, resource, max_days=max_days))
 
-# cotizaciones: la API real del BCRA (fuente principal) y el espejo con caos (respaldo)
-print("BCRA real:", bronze_api.ingest_fx(spark, cfg, bronze_api.bcra_page_getter(), ("USD", "EUR", "BRL"), "bcra", run_id))
-print("espejo:", bronze_api.ingest_fx(spark, cfg, bronze_api.mirror_page_getter(client), ("USD", "EUR", "BRL"), "mirror", run_id))
 bronze_api.flush_calls(spark, cfg, client)
 
 display(spark.sql(f"""
