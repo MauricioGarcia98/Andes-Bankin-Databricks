@@ -52,8 +52,8 @@ class ScaleProfile:
     salary_share: float = 0.60            # clientes que cobran el sueldo en el banco
     credit_card_share: float = 0.35       # clientes con tarjeta de crédito
     debit_card_share: float = 0.85        # cajas de ahorro en pesos con tarjeta de débito
-    txn_per_account_month: float = 4.5    # movimientos "propios" (sin sueldo ni compras con débito)
-    card_purchases_month: float = 3.0     # compras por tarjeta por mes
+    txn_per_account_month: float = 3.5    # movimientos "propios" (sin sueldo ni compras con débito)
+    card_purchases_month: float = 1.6     # compras por tarjeta por mes
     legacy_duplicate_share: float = 0.015 # clientes del NOA que también están como clientes de Cuyo (fusión 2008)
 
 

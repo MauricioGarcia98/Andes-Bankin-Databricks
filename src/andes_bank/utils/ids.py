@@ -64,6 +64,14 @@ def cuit_col(dni: Column, female: Column) -> Column:
         .otherwise(F.concat(body, dv.cast("string")))
 
 
+def cuit_company_col(n8: Column) -> Column:
+    """CUIT de una persona jurídica: 30 + 8 dígitos + DV (si da 10, AFIP usa 33 y DV 9)."""
+    num8 = F.lpad(n8.cast("string"), 8, "0")
+    body = F.concat(F.lit("30"), num8)
+    dv = cuit_dv_col(body)
+    return F.when(dv == 10, F.concat(F.lit("33"), num8, F.lit("9"))).otherwise(F.concat(body, dv.cast("string")))
+
+
 def cuit_valid_col(value: Column) -> Column:
     """True si el CUIT (con o sin guiones) tiene 11 dígitos, prefijo válido y dígito verificador correcto."""
     d = F.regexp_replace(value, r"[^0-9]", "")
