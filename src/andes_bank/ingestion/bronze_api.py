@@ -3,7 +3,7 @@
 Cada registro se guarda CRUDO (el JSON tal cual vino, como texto) más su id y metadatos de ingesta. Silver lo parsea
 con un esquema explícito; así un campo nuevo (wallet_type, mar-2026) no rompe bronze y se ve en silver.
 
-Idempotencia: cada día se escribe con `replaceWhere` sobre su fecha. Re-ingestar un día lo reemplaza, no lo duplica.
+Idempotencia: cada día se escribe reemplazando sólo su fecha (`utils.delta.replace_where`). Re-ingestar un día lo reemplaza, no lo duplica.
 Watermark: `ops.api_watermarks` guarda el último día COMPLETO (conciliado contra los totales) de cada recurso. Un
 día incompleto no avanza el watermark: la próxima corrida lo vuelve a pedir.
 """
@@ -21,6 +21,7 @@ from pyspark.sql import types as T
 from andes_bank.config import ProjectConfig
 from andes_bank.generator.reference import API_V2_LAUNCH
 from andes_bank.ingestion.api_client import ApiClient, DayResult
+from andes_bank.utils.delta import replace_where
 
 RESOURCES = {
     # recurso: (tabla bronze, campo id, parámetro de fecha)
@@ -67,8 +68,8 @@ def _set_watermark(spark: SparkSession, cfg: ProjectConfig, resource: str, day: 
     _ensure(spark, t, T.StructType([T.StructField("resource", T.StringType()),
                                     T.StructField("last_complete_day", T.DateType()),
                                     T.StructField("updated_at", T.TimestampType())]))
-    spark.createDataFrame([(resource, day, datetime.now(timezone.utc))], spark.table(t).schema) \
-        .write.mode("overwrite").option("replaceWhere", f"resource = '{resource}'").saveAsTable(t)
+    replace_where(spark, spark.createDataFrame([(resource, day, datetime.now(timezone.utc))], spark.table(t).schema), t,
+                  f"resource = '{resource}'")
 
 
 def days_to_fetch(spark: SparkSession, cfg: ProjectConfig, resource: str, until: date | None = None,
@@ -87,8 +88,7 @@ def write_day_batch(spark: SparkSession, cfg: ProjectConfig, resource: str, resu
     rows = [(rid, json.dumps(rec, ensure_ascii=False), date.fromisoformat(r.day), "v2", run_id, now)
             for r in results for rid, rec in r.records.items()]
     days = ", ".join(f"'{r.day}'" for r in results)
-    (spark.createDataFrame(rows, BRONZE_API_SCHEMA).write.mode("overwrite")
-     .option("replaceWhere", f"_window_date IN ({days})").saveAsTable(table))
+    replace_where(spark, spark.createDataFrame(rows, BRONZE_API_SCHEMA), table, f"_window_date IN ({days})")
     return len(rows)
 
 
@@ -169,7 +169,7 @@ def ingest_fx(spark: SparkSession, cfg: ProjectConfig, get_page, currencies: tup
             if offset >= body.get("metadata", {}).get("resultset", {}).get("count", 0):
                 break
     cond = f"fecha BETWEEN '{start}' AND '{end}' AND moneda IN ({', '.join(repr(c) for c in currencies)})"
-    spark.createDataFrame(rows, FX_SCHEMA).write.mode("overwrite").option("replaceWhere", cond).saveAsTable(table)
+    replace_where(spark, spark.createDataFrame(rows, FX_SCHEMA), table, cond)
     return len(rows)
 
 

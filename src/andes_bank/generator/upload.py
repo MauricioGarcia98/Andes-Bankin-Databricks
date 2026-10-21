@@ -131,8 +131,13 @@ def api_uploads(cfg: ProjectConfig, start: date | None = None, end: date | None 
 
 # --------------------------------------------------------------------------------------------- subida
 def upload_all(cfg: ProjectConfig, sas_token: str, start: date | None = None, end: date | None = None,
-               parts: tuple[str, ...] = ("core", "cards_legacy", "api_data"), workers: int = 32) -> dict[str, int]:
-    """Sube todo en paralelo. Idempotente: pisa los blobs con el mismo nombre."""
+               parts: tuple[str, ...] = ("core", "cards_legacy", "api_data"), workers: int = 32,
+               skip_existing: bool = True) -> dict[str, int]:
+    """Sube todo en paralelo.
+
+    `skip_existing`: no vuelve a subir lo que ya está. Importa: re-subir un archivo idéntico le cambia el etag, y
+    para el lakehouse eso es "el sistema origen cambió un archivo ya entregado" (estado CHANGED en landing_sync).
+    """
     from azure.storage.blob import BlobServiceClient
 
     service = BlobServiceClient(account_url=f"https://{cfg.storage_account}.blob.core.windows.net", credential=sas_token)
@@ -143,6 +148,11 @@ def upload_all(cfg: ProjectConfig, sas_token: str, start: date | None = None, en
     def put(u: Upload) -> None:
         clients[u.container].upload_blob(u.name, u.data, overwrite=True)
 
+    existing: set[tuple[str, str]] = set()
+    if skip_existing:
+        for c, client in clients.items():
+            existing |= {(c, b.name) for b in client.list_blobs()}
+
     for part in parts:
         n = 0
         pending: dict[tuple[str, str], object] = {}
@@ -150,6 +160,8 @@ def upload_all(cfg: ProjectConfig, sas_token: str, start: date | None = None, en
         with ThreadPoolExecutor(max_workers=workers) as pool:
             for u in gens[part](cfg, start, end):
                 key = (u.container, u.name)
+                if key in existing:
+                    continue
                 if key in pending:            # ING-03: el truncado pisa al completo, tiene que subirse después
                     pending[key].result()
                 gate.acquire()

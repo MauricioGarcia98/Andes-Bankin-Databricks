@@ -31,6 +31,9 @@ def build_local_spark(app_name: str = "andes_bank-local", warehouse_dir: str | N
         .config("spark.sql.session.timeZone", "UTC")
         .config("spark.ui.enabled", "false")
         .config("spark.databricks.delta.schema.autoMerge.enabled", "true")
+        # en Databricks el formato por defecto es Delta; en Spark OSS es Parquet. Sin esto, saveAsTable crea tablas
+        # Parquet en local y las opciones de Delta (replaceWhere) se ignoran EN SILENCIO (bitácora R09).
+        .config("spark.sql.sources.default", "delta")
     )
     if warehouse_dir:
         # metastore Derby persistente: las tablas sobreviven entre ejecuciones locales

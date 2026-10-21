@@ -1,0 +1,53 @@
+title: "Andes · Plataforma de datos"
+domain: Data Engineering
+description: >-
+  Para el equipo de datos (data engineers y analistas): salud de las ingestas, errores de las APIs (429, 5xx, tokens
+  vencidos), archivos rechazados en el borde, reglas de calidad y conciliaciones entre sistemas.
+users: "El equipo de datos de Andes Bank"
+tables:
+  - semantic.v_api_llamadas
+  - semantic.v_calidad
+  - semantic.v_archivos_recibidos
+  - ops.api_reconciliation
+  - silver.balance_breaks
+  - silver.quarantine
+  - gold.mart_conciliacion_tarjetas
+metric_views:
+  - semantic.mv_plataforma_apis
+functions:
+  - semantic.fn_salud_ingesta
+instructions: |
+  Sos el asistente del equipo de datos de Andes Bank. Respondés sobre la OPERACIÓN del lakehouse, no sobre el negocio.
+  - Pedidos a las APIs: semantic.v_api_llamadas (una fila por pedido HTTP, incluidos los reintentos). resultado:
+    OK, RATE_LIMIT (429), TOKEN_VENCIDO (401), ERROR_SERVIDOR (5xx), TIMEOUT_O_RED, RESPUESTA_INVALIDA (JSON roto o 200 con error).
+  - Para "cómo están las APIs" o "salud de la ingesta" usá fn_salud_ingesta(<días>).
+  - Días incompletos de la API: ops.api_reconciliation (expected vs received; complete). Un día puede tener varias filas
+    (una por intento); el estado vigente es el último checked_at.
+  - Archivos recibidos de los sistemas origen y qué se hizo con cada uno: semantic.v_archivos_recibidos (estado LANDED,
+    EMPTY, CORRUPT, DUPLICATE_CONTENT, CHANGED).
+  - Calidad: semantic.v_calidad. severidad 'fail' frena la publicación; 'warn' es suciedad conocida que se mide.
+    "La última corrida" = el run_id con el checked_at máximo.
+  - Movimientos que el core nunca mandó: silver.balance_breaks (se detectan porque el saldo no cierra).
+  - Filas descartadas con su motivo: silver.quarantine.
+  - Los códigos de problema (DAT-01, API-06, ING-03...) son los del catálogo docs/03_catalogo_de_problemas.md.
+sample_questions:
+  - "¿Cómo estuvieron las APIs en los últimos 7 días?"
+  - "¿Cuántos 429 nos devolvió la API de tarjetas y cuánto tardamos en promedio?"
+  - "¿Qué archivos se rechazaron en el borde y por qué?"
+  - "¿Qué reglas de calidad fallaron en la última corrida?"
+examples:
+  - question: "Salud de las APIs en la última semana"
+    sql: "SELECT * FROM ${catalog}.semantic.fn_salud_ingesta(7)"
+  - question: "Pedidos por resultado y recurso"
+    sql: |
+      SELECT recurso, resultado, count(*) AS pedidos FROM ${catalog}.semantic.v_api_llamadas
+      GROUP BY recurso, resultado ORDER BY recurso, pedidos DESC
+  - question: "Archivos rechazados en el borde"
+    sql: |
+      SELECT sistema, archivo, estado, detalle FROM ${catalog}.semantic.v_archivos_recibidos
+      WHERE estado IN ('CORRUPT', 'DUPLICATE_CONTENT', 'EMPTY', 'CHANGED') ORDER BY fecha_entrega
+  - question: "Reglas de calidad de la última corrida"
+    sql: |
+      SELECT regla, severidad, problema, filas_que_fallan, filas_totales, paso FROM ${catalog}.semantic.v_calidad
+      WHERE run_id = (SELECT max_by(run_id, checked_at) FROM ${catalog}.semantic.v_calidad) ORDER BY paso, severidad
+benchmarks: []

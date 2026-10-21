@@ -114,8 +114,18 @@ CUSTOMER_ATTRS = ["nombre_completo", "tipo_persona", "dni", "cuit", "fecha_nacim
                   "provincia", "sucursal_id", "segmento", "fecha_alta"]
 
 
+# SCD mixto: el nombre que se muestra es tipo 1 (siempre el último que mandó el core: el sistema viejo lo mandaba sin
+# acentos y el nuevo con acentos, y eso NO es un cambio de negocio). Para detectar cambios se usa el nombre normalizado.
+CUSTOMER_SCD2_ATTRS = ["nombre_normalizado"] + [a for a in CUSTOMER_ATTRS if a != "nombre_completo"]
+
+
 def customers_history(spark: SparkSession, cfg: ProjectConfig) -> DataFrame:
-    h = scd2_from_events(customer_events(spark, cfg), "cliente_id", CUSTOMER_ATTRS)
+    events = customer_events(spark, cfg)
+    h = scd2_from_events(events, "cliente_id", CUSTOMER_SCD2_ATTRS)
+    w = Window.partitionBy("cliente_id").orderBy(F.desc("event_ts_utc"), F.desc("_delivery_date"), F.desc("_ingested_at"))
+    latest_name = (events.withColumn("_rn", F.row_number().over(w)).where("_rn = 1")
+                   .select("cliente_id", F.col("nombre_completo").alias("_nombre_actual")))
+    h = h.join(latest_name, "cliente_id").withColumn("nombre_completo", F.col("_nombre_actual")).drop("_nombre_actual")
     return h.select("cliente_id", *CUSTOMER_ATTRS, "nombre_normalizado", "cuit_valido", "observaciones",
                     "observaciones_con_pii", "estado", "valid_from", "valid_to", "is_current", "version",
                     "sistema_origen", "_source_file")

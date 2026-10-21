@@ -1,0 +1,47 @@
+title: "Andes · Finanzas y tesorería"
+domain: Tesorería
+description: >-
+  Para Tesorería y Finanzas: stock de depósitos en pesos y en dólares, posición en dólares, flujos de fondos y el
+  impacto del tipo de cambio oficial (incluida la devaluación de diciembre de 2023).
+users: "Carolina Sosa (Tesorera) y el equipo de Finanzas"
+tables:
+  - gold.fact_saldo_diario
+  - gold.mart_tesoreria_mensual
+  - gold.fact_movimiento
+  - gold.dim_fecha
+metric_views:
+  - semantic.mv_depositos
+  - semantic.mv_movimientos
+functions:
+  - semantic.fn_posicion_dolares
+instructions: |
+  Sos el asistente de Tesorería de Andes Bank.
+  - "Depósitos" o "stock" = saldos a FIN DE MES (fact_saldo_diario con es_fin_de_mes = true o mart_tesoreria_mensual).
+    Nunca sumes saldos de varios días: un saldo es una foto, no un flujo.
+  - Nunca sumes pesos con dólares en moneda original: usá saldo_ars (todo valuado en pesos al oficial del día) o saldo_usd.
+  - El dólar oficial está en gold.dim_fecha.usd_oficial (BCRA). Fines de semana y feriados repiten la última cotización.
+  - Para la posición en dólares a una fecha usá fn_posicion_dolares('yyyy-MM-dd').
+  - Flujos (entradas y salidas de plata) salen de fact_movimiento: importe > 0 es crédito, < 0 débito.
+  - La devaluación fue el 13 de diciembre de 2023: el oficial pasó de ~366 a ~800 pesos por dólar.
+  - Montos sin decimales; en pesos con separador de miles.
+sample_questions:
+  - "¿Cuántos depósitos en dólares teníamos a fin de cada mes de 2025?"
+  - "¿Cómo cambió el stock de depósitos valuado en pesos con la devaluación de diciembre de 2023?"
+  - "¿Cuál es la posición en dólares al 30 de junio de 2026?"
+  - "¿Cuánto entró por acreditaciones de sueldo por mes?"
+examples:
+  - question: "Depósitos a fin de mes por moneda"
+    sql: |
+      SELECT anio_mes, moneda, round(sum(saldo_moneda_original), 0) AS saldo, round(sum(saldo_ars), 0) AS saldo_ars
+      FROM ${catalog}.gold.mart_tesoreria_mensual GROUP BY anio_mes, moneda ORDER BY anio_mes, moneda
+  - question: "Posición en dólares a una fecha"
+    sql: "SELECT * FROM ${catalog}.semantic.fn_posicion_dolares('2026-06-30')"
+  - question: "Dólar oficial alrededor de la devaluación"
+    sql: |
+      SELECT fecha, usd_oficial FROM ${catalog}.gold.dim_fecha
+      WHERE fecha BETWEEN '2023-12-01' AND '2023-12-31' ORDER BY fecha
+  - question: "Acreditaciones de sueldo por mes (metric view)"
+    sql: |
+      SELECT `Mes`, round(MEASURE(`Créditos (ARS)`), 0) AS acreditado_ars
+      FROM ${catalog}.semantic.mv_movimientos WHERE `Concepto` = 'ACREDITACION_SUELDO' GROUP BY ALL ORDER BY `Mes`
+benchmarks: []

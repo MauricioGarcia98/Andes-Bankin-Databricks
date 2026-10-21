@@ -1,0 +1,62 @@
+# Job principal del lakehouse: Azure/APIs → landing → bronze → silver → gold → quality gate.
+# Compute serverless. Cada task es un notebook delgado que llama al paquete `andes_bank` (código testeado).
+resources:
+  jobs:
+    andes_lakehouse:
+      name: andes-bank-lakehouse
+      description: "Pipeline medallion de Andes Bank: core (Blob), procesador de tarjetas (API), BCRA, gold y quality gate"
+      max_concurrent_runs: 1
+      timeout_seconds: 14400
+      tags:
+        project: andes-bank
+        layer: all
+      parameters:
+        - name: catalog
+          default: ${var.catalog}
+        - name: scale_factor
+          default: ${var.scale_factor}
+        - name: start_date
+          default: ${var.start_date}
+        - name: end_date
+          default: ${var.end_date}
+        - name: run_id
+          default: "{{job.run_id}}"
+      tasks:
+        - task_key: setup
+          notebook_task:
+            notebook_path: ../notebooks/00_setup.py
+        # los archivos (Blob → Volume → Auto Loader) y las APIs corren en paralelo
+        - task_key: landing_sync
+          depends_on: [{ task_key: setup }]
+          max_retries: 2
+          min_retry_interval_millis: 60000
+          notebook_task:
+            notebook_path: ../notebooks/10_landing_sync.py
+        - task_key: bronze_files
+          depends_on: [{ task_key: landing_sync }]
+          max_retries: 1
+          notebook_task:
+            notebook_path: ../notebooks/11_bronze_files.py
+        - task_key: bronze_api
+          depends_on: [{ task_key: setup }]
+          # el cliente ya reintenta cada pedido; esto es para caídas de la API más largas (el watermark retoma)
+          max_retries: 2
+          min_retry_interval_millis: 300000
+          notebook_task:
+            notebook_path: ../notebooks/12_bronze_api.py
+        - task_key: silver
+          depends_on: [{ task_key: bronze_files }, { task_key: bronze_api }]
+          notebook_task:
+            notebook_path: ../notebooks/20_silver.py
+        - task_key: gold
+          depends_on: [{ task_key: silver }]
+          notebook_task:
+            notebook_path: ../notebooks/30_gold.py
+        - task_key: governance_semantic
+          depends_on: [{ task_key: gold }]
+          notebook_task:
+            notebook_path: ../notebooks/35_governance_semantic.py
+        - task_key: quality_gate
+          depends_on: [{ task_key: governance_semantic }]
+          notebook_task:
+            notebook_path: ../notebooks/40_quality_gate.py

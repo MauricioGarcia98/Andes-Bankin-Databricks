@@ -42,6 +42,19 @@ def merge_upsert_when(spark: SparkSession, source: DataFrame, target: str, keys:
      .whenMatchedUpdateAll(condition=update_when).whenNotMatchedInsertAll().execute())
 
 
+def replace_where(spark: SparkSession, df: DataFrame, target: str, condition: str) -> None:
+    """Reemplaza SÓLO las filas que cumplen `condition` por el contenido de `df` (atómico).
+
+    Ojo (error real de este proyecto): `df.write.mode("overwrite").option("replaceWhere", ...).saveAsTable(t)` en Delta
+    OSS ignora el replaceWhere y pisa la tabla ENTERA. `writeTo(t).overwrite(condición)` se comporta igual en local y
+    en Databricks.
+    """
+    if not spark.catalog.tableExists(target):
+        df.writeTo(target).using("delta").create()
+        return
+    df.writeTo(target).overwrite(F.expr(condition))
+
+
 WATERMARK_SCHEMA = T.StructType([T.StructField("entity", T.StringType()), T.StructField("last_ingested_at", T.TimestampType()),
                                  T.StructField("updated_at", T.TimestampType())])
 
@@ -59,5 +72,5 @@ def set_watermark(spark: SparkSession, cfg: ProjectConfig, entity: str, value) -
     t = cfg.table("ops", "silver_watermarks")
     if not spark.catalog.tableExists(t):
         spark.createDataFrame([], WATERMARK_SCHEMA).write.saveAsTable(t)
-    spark.createDataFrame([(entity, value, datetime.now(timezone.utc))], WATERMARK_SCHEMA) \
-        .write.mode("overwrite").option("replaceWhere", f"entity = '{entity}'").saveAsTable(t)
+    replace_where(spark, spark.createDataFrame([(entity, value, datetime.now(timezone.utc))], WATERMARK_SCHEMA), t,
+                  f"entity = '{entity}'")

@@ -1,0 +1,23 @@
+# 08 · Bitácora: los errores reales de la construcción
+
+> Cada entrada es algo que **de verdad** salió mal mientras se construía el proyecto, con el síntoma, la causa y el
+> arreglo. Es la fuente de las secciones "🔥 Si falla" de `construir/` y de buena parte del posteo de LinkedIn.
+
+| # | etapa | síntoma | causa | arreglo |
+|---|---|---|---|---|
+| R01 | 03 | Los saldos de las cajas de ahorro crecían sin techo (mediana de 12 M de pesos) | En el generador entraba más plata (sueldo) de la que salía | A fin de mes, lo que excede 2,5 ingresos va a plazo fijo. Se calcula con un **máximo corrido** (`S_m = max(0, max_{k≤m}(B_k − T_k))`), sin bucles |
+| R02 | 04 | `saldo` aparecía como `1.869293698E7` en el CSV | Spark escribe los `double` en notación científica | Exportar montos como `decimal(18,2)` |
+| R03 | 04 | El archivo del 12-ago que "llega tarde" se mezclaba con el del 15 | Se particionaba sólo por fecha de entrega | Particionar por **fecha de entrega y fecha del archivo** |
+| R04 | 05 | `az storage container create` → `Tunnel connection failed: 403` | La red del entorno de desarrollo bloquea el endpoint de datos de Blob (`*.blob.core.windows.net`) | `az storage container-rm create`: crea los contenedores por el plano de administración (`management.azure.com`) |
+| R05 | 07 | Free Edition no deja crear una *external location* hacia Azure | Free Edition no admite storage propio, y la credencial pedía guardar el secreto de un service principal | Sincronización Blob → Volume con una SAS de **sólo lectura** ([ADR 0002](adr/0002_landing_sync_blob_a_volume.md)) |
+| R06 | 10 | Los tests de la API quedaban colgados, al 0 % de CPU | **Deadlock**: `_bearer()` toma el lock y al renovar el token `_log()` lo vuelve a tomar (`threading.Lock` no es reentrante) | `threading.RLock()` |
+| R07 | 07 | (prevenido) Re-correr el uploader iba a marcar todos los archivos como `CHANGED` | Re-subir un archivo idéntico le cambia el etag al blob | `upload_all(skip_existing=True)`: sólo sube lo que falta |
+| R08 | 13 | La recarga completa del core nuevo (mar-2024) generaba cientos de versiones SCD2 | El core viejo mandaba los nombres sin acentos ("Belen") y el nuevo con acentos ("Belén") | SCD **mixto**: el nombre para mostrar es tipo 1; el control de cambios usa el nombre normalizado |
+| R09 | 11 | En el test local faltaban ~20 mil autorizaciones de la API | En Spark OSS el formato por defecto de `saveAsTable` es **Parquet** (en Databricks, Delta): las tablas locales eran Parquet y `replaceWhere` (opción de Delta) se ignoraba en silencio, así que cada lote de días pisaba la tabla entera | `spark.sql.sources.default=delta` en la sesión local y `df.writeTo(t).overwrite(condición)` (`utils.delta.replace_where`), explícito y sin depender del formato por defecto. Lección: el entorno local tiene que parecerse a Databricks en lo que importa |
+| R10 | 18 | (heredada de Viento Austral) Genie rechaza TODAS las preguntas de un agent | Una función certificada con parámetros `DATE` | Parámetros de fecha como `STRING 'yyyy-MM-dd'` |
+
+## Cómo se encontraron
+
+Casi todos los errores aparecieron en los **tests**, no en producción: R06 en los tests de ingesta, R08 y R09 en el test
+de punta a punta, que compara el lakehouse contra la "verdad" del generador. Esa es la ventaja de tener una verdad
+conocida: si el pipeline recupera lo que pasó, está bien; si no, hay un bug.
