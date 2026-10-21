@@ -137,8 +137,19 @@ def load_balance_breaks(spark: SparkSession, cfg: ProjectConfig) -> int:
     return _overwrite(core.balance_breaks(spark.table(cfg.table("silver", "transactions"))), cfg, "balance_breaks")
 
 
+QUARANTINE_DDL = "entidad STRING, clave STRING, motivo STRING, fila STRING, _quarantined_at TIMESTAMP"
+
+
+def ensure_quarantine(spark: SparkSession, cfg: ProjectConfig) -> None:
+    """La tabla existe aunque no haya nada en cuarentena (Genie y las reglas la consultan igual)."""
+    table = cfg.table("silver", "quarantine")
+    if not spark.catalog.tableExists(table):
+        spark.createDataFrame([], QUARANTINE_DDL).write.saveAsTable(table)
+
+
 def load_all(spark: SparkSession, cfg: ProjectConfig) -> dict:
     started = datetime.now(timezone.utc)
+    ensure_quarantine(spark, cfg)
     out = {"masters": load_masters(spark, cfg)}
     out["transactions"] = load_transactions(spark, cfg)
     out["balances"] = load_balances(spark, cfg)
