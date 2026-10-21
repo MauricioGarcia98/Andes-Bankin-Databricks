@@ -20,9 +20,8 @@ import logging
 import os
 import re
 import threading
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
 from datetime import date, timedelta
 
 from andes_bank.config import CONTAINERS, ProjectConfig
@@ -35,11 +34,20 @@ CORE_PREFIX = {"clientes": "CLIENTES", "cuentas": "CUENTAS", "tarjetas": "TARJET
 _PART = re.compile(r"^part-.*\.(csv|csv\.gz|json)$")
 
 
-@dataclass(frozen=True)
 class Upload:
-    container: str
-    name: str
-    data: bytes
+    """Un blob a subir. El contenido se lee recién cuando hace falta (`data`): si el blob ya existe en Azure, nunca se
+    lee del Volume. Con miles de archivos y GB de datos, eso es la diferencia entre segundos y media hora."""
+
+    __slots__ = ("container", "name", "_data", "_load")
+
+    def __init__(self, container: str, name: str, data: bytes | None = None, load: Callable[[], bytes] | None = None):
+        self.container, self.name, self._data, self._load = container, name, data, load
+
+    @property
+    def data(self) -> bytes:
+        if self._data is None:
+            self._data = self._load()
+        return self._data
 
 
 def _parts(folder: str) -> list[str]:
@@ -82,13 +90,15 @@ def core_uploads(cfg: ProjectConfig, start: date | None = None, end: date | None
                 if not files:
                     continue
                 ext = "csv.gz" if files[0].endswith(".gz") else "csv"
-                data = _concat(files)
                 folder = f"{source}/{delivery:%Y/%m/%d}"
                 resend = source == "movimientos" and file_date in (EMPTY_FILE, CORRUPT_FILE) and delivery != file_date
                 name = f"{folder}/{prefix}_{file_date:%Y%m%d}{'_REENVIO' if resend else ''}.{ext}"
-                yield Upload(container, name, data)
-                if source != "movimientos":
+                incident = source == "movimientos" and (file_date in (EMPTY_FILE, CORRUPT_FILE, DUPLICATE_FILE))
+                if not incident:
+                    yield Upload(container, name, load=lambda files=files: _concat(files))
                     continue
+                data = _concat(files)
+                yield Upload(container, name, data)
                 if file_date == EMPTY_FILE and resend:                                        # ING-02
                     header = gzip.decompress(data).split(b"\n", 1)[0] + b"\n"
                     yield Upload(container, f"movimientos/{EMPTY_FILE:%Y/%m/%d}/{prefix}_{EMPTY_FILE:%Y%m%d}.{ext}",
@@ -107,19 +117,26 @@ def cards_legacy_uploads(cfg: ProjectConfig, start: date | None = None, end: dat
     for source in ("autorizaciones", "liquidaciones"):
         for delivery, ddir in _dated_dirs(cfg.staging_path(f"cards_legacy/{source}"), "delivery_date"):
             if _in_range(delivery, start, end) and (files := _parts(ddir)):
-                yield Upload(container, f"{source}/{delivery:%Y/%m/%d}/{source}_{delivery:%Y%m%d}.json", _concat(files))
+                yield Upload(container, f"{source}/{delivery:%Y/%m/%d}/{source}_{delivery:%Y%m%d}.json",
+                             load=lambda files=files: _concat(files))
 
 
-def api_uploads(cfg: ProjectConfig, start: date | None = None, end: date | None = None) -> Iterator[Upload]:
-    """Parte cada día en páginas de 1.000 registros + un _manifest.json con los totales (para conciliar)."""
+def api_uploads(cfg: ProjectConfig, start: date | None = None, end: date | None = None,
+                existing: set[str] | None = None) -> Iterator[Upload]:
+    """Parte cada día en páginas de 1.000 registros + un _manifest.json con los totales (para conciliar).
+
+    El manifiesto se sube último: si ya está en `existing`, el día entero ya se subió y ni se lee.
+    """
     container = CONTAINERS["api_data"]
     amount_field = {"authorizations": "billing_amount_ars", "settlements": "settled_billing_ars"}
     for resource, amount in amount_field.items():
         for day, ddir in _dated_dirs(cfg.staging_path(f"api_data/{resource}"), "delivery_date"):
             if not _in_range(day, start, end):
                 continue
-            rows = [json.loads(line) for line in _concat(_parts(ddir)).decode("utf-8").splitlines() if line.strip()]
             folder = f"{resource}/{day:%Y/%m/%d}"
+            if existing and f"{folder}/_manifest.json" in existing:
+                continue
+            rows = [json.loads(line) for line in _concat(_parts(ddir)).decode("utf-8").splitlines() if line.strip()]
             pages = 0
             for i in range(0, len(rows), PAGE_SIZE):
                 pages += 1
@@ -158,7 +175,9 @@ def upload_all(cfg: ProjectConfig, sas_token: str, start: date | None = None, en
         pending: dict[tuple[str, str], object] = {}
         gate = threading.BoundedSemaphore(workers * 2)        # como mucho 2x workers archivos en memoria
         with ThreadPoolExecutor(max_workers=workers) as pool:
-            for u in gens[part](cfg, start, end):
+            uploads = (api_uploads(cfg, start, end, {n for c, n in existing if c == CONTAINERS["api_data"]})
+                       if part == "api_data" else gens[part](cfg, start, end))
+            for u in uploads:
                 key = (u.container, u.name)
                 if key in existing:
                     continue
