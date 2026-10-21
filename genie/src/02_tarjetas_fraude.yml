@@ -46,4 +46,38 @@ examples:
       SELECT date_format(a.fecha, 'yyyy-MM') AS mes, round(sum(a.importe_ars), 0) AS consumo_ars, round(sum(a.importe_usd), 0) AS consumo_usd
       FROM ${catalog}.gold.fact_autorizacion a JOIN ${catalog}.gold.dim_comercio co ON co.comercio_id = a.comercio_id
       WHERE a.aprobada AND co.es_exterior GROUP BY mes ORDER BY mes
-benchmarks: []
+benchmarks:
+- q: ¿Cuántas autorizaciones de tarjeta hay en total?
+  sql: SELECT count(*) FROM ${catalog}.gold.fact_autorizacion
+- q: ¿Cuál es la tasa de aprobación general?
+  sql: SELECT round(avg(CASE WHEN aprobada THEN 1.0 ELSE 0 END) * 100, 2) FROM ${catalog}.gold.fact_autorizacion
+- q: ¿Cuántos rechazos por sospecha de fraude hubo en 2025?
+  sql: SELECT count(*) FROM ${catalog}.gold.fact_autorizacion WHERE rechazo_por_sospecha AND year(fecha) = 2025
+- q: ¿Qué rubro tuvo más rechazos por sospecha de fraude?
+  sql: SELECT co.rubro FROM ${catalog}.gold.fact_autorizacion a JOIN ${catalog}.gold.dim_comercio co ON co.comercio_id = a.comercio_id WHERE a.rechazo_por_sospecha GROUP BY co.rubro ORDER BY count(*) DESC
+    LIMIT 1
+- q: ¿Cuánto se consumió con tarjetas (aprobadas) en 2025 en pesos?
+  sql: SELECT round(sum(importe_ars), 0) FROM ${catalog}.gold.fact_autorizacion WHERE aprobada AND year(fecha) = 2025
+- q: ¿Qué rubro concentra más consumo aprobado?
+  sql: SELECT co.rubro FROM ${catalog}.gold.fact_autorizacion a JOIN ${catalog}.gold.dim_comercio co ON co.comercio_id = a.comercio_id WHERE a.aprobada GROUP BY co.rubro ORDER BY sum(a.importe_ars) DESC
+    LIMIT 1
+- q: ¿Cuántas compras aprobadas fueron en comercios del exterior?
+  sql: SELECT count(*) FROM ${catalog}.gold.fact_autorizacion a JOIN ${catalog}.gold.dim_comercio co ON co.comercio_id = a.comercio_id WHERE a.aprobada AND co.es_exterior
+- q: ¿Cuál es el ticket promedio aprobado con tarjeta de crédito en 2026?
+  sql: SELECT round(avg(importe_ars), 0) FROM ${catalog}.gold.fact_autorizacion WHERE aprobada AND tipo_tarjeta = 'CREDITO' AND year(fecha) = 2026
+- q: ¿Cuántos rechazos por fondos insuficientes hubo?
+  sql: SELECT count(*) FROM ${catalog}.gold.fact_autorizacion WHERE codigo_respuesta = '51_FONDOS_INSUFICIENTES'
+- q: ¿Qué marca de tarjeta tiene más autorizaciones?
+  sql: SELECT marca FROM ${catalog}.gold.fact_autorizacion GROUP BY marca ORDER BY count(*) DESC LIMIT 1
+- q: ¿Cuántas tarjetas distintas compraron en 2025?
+  sql: SELECT count(DISTINCT token_tarjeta) FROM ${catalog}.gold.fact_autorizacion WHERE aprobada AND year(fecha) = 2025
+- q: ¿Cuántas autorizaciones aprobadas siguen sin liquidar?
+  sql: SELECT count(*) FROM ${catalog}.gold.fact_autorizacion WHERE aprobada AND NOT liquidada
+- q: ¿Cuántos días tarda en promedio una compra en liquidarse?
+  sql: SELECT round(avg(dias_a_liquidar), 2) FROM ${catalog}.gold.fact_autorizacion WHERE liquidada
+- q: ¿Qué porcentaje de las compras contactless fue con billetera en 2026?
+  sql: SELECT round(avg(CASE WHEN billetera IS NOT NULL THEN 1.0 ELSE 0 END) * 100, 1) FROM ${catalog}.gold.fact_autorizacion WHERE modo_ingreso = 'CONTACTLESS' AND fecha >= '2026-03-01'
+- q: ¿Cuántas tarjetas tuvieron patrón de fraude en todo 2025?
+  sql: SELECT count(DISTINCT token_tarjeta) FROM ${catalog}.semantic.fn_alertas_fraude('2025-01-01', '2025-12-31')
+- q: ¿En qué hora del día hay más compras aprobadas?
+  sql: SELECT hora_local FROM ${catalog}.gold.fact_autorizacion WHERE aprobada GROUP BY hora_local ORDER BY count(*) DESC LIMIT 1

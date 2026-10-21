@@ -48,4 +48,36 @@ examples:
     sql: |
       SELECT count(DISTINCT persona_id) FROM ${catalog}.gold.dim_cliente
       WHERE is_current AND regla_identidad = 'DNI+NOMBRE'
-benchmarks: []
+benchmarks:
+- q: ¿Cuántos clientes vigentes tenemos?
+  sql: SELECT count(*) FROM ${catalog}.gold.mart_cliente_360
+- q: ¿Cuántos clientes activos hay en el segmento PREMIUM?
+  sql: SELECT count(*) FROM ${catalog}.gold.mart_cliente_360 WHERE segmento = 'PREMIUM' AND estado = 'ACTIVO'
+- q: ¿Cuántas personas distintas son clientes?
+  sql: SELECT count(DISTINCT persona_id) FROM ${catalog}.gold.mart_cliente_360
+- q: ¿Qué región tiene más clientes?
+  sql: SELECT region FROM ${catalog}.gold.mart_cliente_360 GROUP BY region ORDER BY count(*) DESC LIMIT 1
+- q: ¿Cuántos clientes tienen tarjeta de crédito?
+  sql: SELECT count(*) FROM ${catalog}.gold.mart_cliente_360 WHERE tiene_tarjeta_credito
+- q: ¿Qué porcentaje de los clientes tiene caja de ahorro en dólares?
+  sql: SELECT round(avg(CASE WHEN tiene_caja_usd THEN 1.0 ELSE 0 END) * 100, 1) FROM ${catalog}.gold.mart_cliente_360
+- q: ¿Cuántos productos tiene en promedio un cliente PYME?
+  sql: SELECT round(avg(cantidad_productos), 2) FROM ${catalog}.gold.mart_cliente_360 WHERE segmento = 'PYME'
+- q: ¿Cuántos clientes cobran el sueldo en el banco y no tienen tarjeta de crédito?
+  sql: SELECT count(*) FROM ${catalog}.gold.mart_cliente_360 WHERE cobra_sueldo AND NOT tiene_tarjeta_credito AND estado = 'ACTIVO'
+- q: ¿Qué sucursal física tiene más clientes?
+  sql: SELECT sucursal FROM ${catalog}.gold.mart_cliente_360 WHERE sucursal_id <> 999 GROUP BY sucursal ORDER BY count(*) DESC LIMIT 1
+- q: ¿Cuántos clientes son 100% digitales?
+  sql: SELECT count(*) FROM ${catalog}.gold.mart_cliente_360 WHERE region = 'DIGITAL'
+- q: ¿Cuántos clientes dieron de baja su relación con el banco?
+  sql: SELECT count(*) FROM ${catalog}.gold.mart_cliente_360 WHERE estado = 'BAJA'
+- q: ¿Cuántas personas tienen dos números de cliente por la fusión con el banco del NOA?
+  sql: SELECT count(DISTINCT persona_id) FROM ${catalog}.gold.dim_cliente WHERE is_current AND regla_identidad = 'DNI+NOMBRE'
+- q: Saldo total en pesos de los clientes de la región NOA
+  sql: SELECT round(sum(saldo_total_ars), 0) FROM ${catalog}.gold.mart_cliente_360 WHERE region = 'NOA'
+- q: ¿Cuántos clientes cambiaron de segmento alguna vez?
+  sql: SELECT count(DISTINCT cliente_id) FROM (SELECT cliente_id, count(DISTINCT segmento) AS s FROM ${catalog}.gold.dim_cliente GROUP BY cliente_id) WHERE s > 1
+- q: Porcentaje digital promedio de los clientes PREMIUM
+  sql: SELECT round(avg(porcentaje_digital_90d), 1) FROM ${catalog}.gold.mart_cliente_360 WHERE segmento = 'PREMIUM'
+- q: ¿Cuántos clientes son empresas?
+  sql: SELECT count(*) FROM ${catalog}.gold.mart_cliente_360 WHERE tipo_persona = 'JURIDICA'

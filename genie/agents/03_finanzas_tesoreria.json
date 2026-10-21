@@ -1,0 +1,338 @@
+{
+  "title": "Andes · Finanzas y tesorería",
+  "description": "Para Tesorería y Finanzas: stock de depósitos en pesos y en dólares, posición en dólares, flujos de fondos y el impacto del tipo de cambio oficial (incluida la devaluación de diciembre de 2023).",
+  "domain": "Tesorería",
+  "users": "Carolina Sosa (Tesorera) y el equipo de Finanzas",
+  "serialized_space": {
+    "version": 2,
+    "config": {
+      "sample_questions": [
+        {
+          "id": "008b0cff83b14071030bcca4c4c575ed",
+          "question": [
+            "¿Cómo cambió el stock de depósitos valuado en pesos con la devaluación de diciembre de 2023?"
+          ]
+        },
+        {
+          "id": "4c3054d90716c7b94bf3987a340906ba",
+          "question": [
+            "¿Cuál es la posición en dólares al 30 de junio de 2026?"
+          ]
+        },
+        {
+          "id": "e90a21b3ff76a486c10715407fd222eb",
+          "question": [
+            "¿Cuántos depósitos en dólares teníamos a fin de cada mes de 2025?"
+          ]
+        },
+        {
+          "id": "f09c3d6d6ecec7c51bf42acb1314cd9f",
+          "question": [
+            "¿Cuánto entró por acreditaciones de sueldo por mes?"
+          ]
+        }
+      ]
+    },
+    "data_sources": {
+      "tables": [
+        {
+          "identifier": "${catalog}.gold.dim_fecha"
+        },
+        {
+          "identifier": "${catalog}.gold.fact_movimiento"
+        },
+        {
+          "identifier": "${catalog}.gold.fact_saldo_diario"
+        },
+        {
+          "identifier": "${catalog}.gold.mart_tesoreria_mensual"
+        },
+        {
+          "identifier": "${catalog}.semantic.mv_depositos"
+        },
+        {
+          "identifier": "${catalog}.semantic.mv_movimientos"
+        }
+      ]
+    },
+    "instructions": {
+      "text_instructions": [
+        {
+          "id": "f0971e236fc05bb90dc76d9f497466a6",
+          "content": [
+            "Sos el asistente de Tesorería de Andes Bank.\n",
+            "- \"Depósitos\" o \"stock\" = saldos a FIN DE MES (fact_saldo_diario con es_fin_de_mes = true o mart_tesoreria_mensual).\n",
+            "  Nunca sumes saldos de varios días: un saldo es una foto, no un flujo.\n",
+            "- Nunca sumes pesos con dólares en moneda original: usá saldo_ars (todo valuado en pesos al oficial del día) o saldo_usd.\n",
+            "- El dólar oficial está en gold.dim_fecha.usd_oficial (BCRA). Fines de semana y feriados repiten la última cotización.\n",
+            "- Para la posición en dólares a una fecha usá fn_posicion_dolares('yyyy-MM-dd').\n",
+            "- Flujos (entradas y salidas de plata) salen de fact_movimiento: importe > 0 es crédito, < 0 débito.\n",
+            "- La devaluación fue el 13 de diciembre de 2023: el oficial pasó de ~366 a ~800 pesos por dólar.\n",
+            "- Montos sin decimales; en pesos con separador de miles."
+          ]
+        }
+      ],
+      "example_question_sqls": [
+        {
+          "id": "3193f66d6e309fb3666502e9d29d8b84",
+          "question": [
+            "Acreditaciones de sueldo por mes (metric view)"
+          ],
+          "sql": [
+            "SELECT `Mes`, round(MEASURE(`Créditos (ARS)`), 0) AS acreditado_ars\n",
+            "FROM ${catalog}.semantic.mv_movimientos WHERE `Concepto` = 'ACREDITACION_SUELDO' GROUP BY ALL ORDER BY `Mes`"
+          ]
+        },
+        {
+          "id": "9943bfc8cc44dccf86bbe91c651001d9",
+          "question": [
+            "Depósitos a fin de mes por moneda"
+          ],
+          "sql": [
+            "SELECT anio_mes, moneda, round(sum(saldo_moneda_original), 0) AS saldo, round(sum(saldo_ars), 0) AS saldo_ars\n",
+            "FROM ${catalog}.gold.mart_tesoreria_mensual GROUP BY anio_mes, moneda ORDER BY anio_mes, moneda"
+          ]
+        },
+        {
+          "id": "a3ac0bb62e0fb435de5050171d6a3eae",
+          "question": [
+            "Dólar oficial alrededor de la devaluación"
+          ],
+          "sql": [
+            "SELECT fecha, usd_oficial FROM ${catalog}.gold.dim_fecha\n",
+            "WHERE fecha BETWEEN '2023-12-01' AND '2023-12-31' ORDER BY fecha"
+          ]
+        },
+        {
+          "id": "d975df07ec9553c893c9ded60b34e172",
+          "question": [
+            "Posición en dólares a una fecha"
+          ],
+          "sql": [
+            "SELECT * FROM ${catalog}.semantic.fn_posicion_dolares('2026-06-30')"
+          ]
+        }
+      ],
+      "sql_functions": [
+        {
+          "id": "2dd9f8935d85e884e4354873a179ed24",
+          "identifier": "${catalog}.semantic.fn_posicion_dolares"
+        }
+      ]
+    },
+    "benchmarks": {
+      "questions": [
+        {
+          "id": "23a90f26739b90a2e68fc46548254c34",
+          "question": [
+            "¿Cuánto se invirtió en plazos fijos en 2025?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT round(-sum(importe_ars), 0) FROM ${catalog}.gold.fact_movimiento WHERE concepto = 'CONSTITUCION_PLAZO_FIJO' AND year(fecha_contable) = 2025"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "278230e0d5de44807dab86da2bb8ddf8",
+          "question": [
+            "¿Qué segmento tiene más depósitos en pesos al último fin de mes?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT segmento FROM ${catalog}.gold.mart_tesoreria_mensual WHERE fecha = (SELECT max(fecha) FROM ${catalog}.gold.mart_tesoreria_mensual) GROUP BY segmento ORDER BY sum(saldo_ars) DESC LIMIT 1"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "3588d052f2146a9601a6ba0eda34e4a2",
+          "question": [
+            "¿Cuántas cuentas en dólares tenían saldo al último fin de mes?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT count(*) FROM ${catalog}.gold.fact_saldo_diario WHERE es_fin_de_mes AND moneda = 'USD' AND fecha = (SELECT max(fecha) FROM ${catalog}.gold.fact_saldo_diario WHERE es_fin_de_mes)"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "3680681fb34c6770ccda8a39122adc5f",
+          "question": [
+            "¿Cuántas veces subió el dólar oficial entre el 1 y el 31 de diciembre de 2023 (cociente)?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT round(max_by(usd_oficial, fecha) / min_by(usd_oficial, fecha), 2) FROM ${catalog}.gold.dim_fecha WHERE fecha BETWEEN '2023-12-01' AND '2023-12-31'"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "56c2adf55d8ea9af43415f226a5871dd",
+          "question": [
+            "¿Cuál fue el dólar oficial más alto del período?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT max(usd_oficial) FROM ${catalog}.gold.dim_fecha"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "74934cb013b9d67968205900d68ab416",
+          "question": [
+            "¿Cuál es el stock de depósitos en pesos (todo valuado en pesos) al último fin de mes?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT round(sum(saldo_ars), 0) FROM ${catalog}.gold.fact_saldo_diario WHERE es_fin_de_mes AND fecha = (SELECT max(fecha) FROM ${catalog}.gold.fact_saldo_diario WHERE es_fin_de_mes)"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "80f631f7d7ded652826053338e5a0956",
+          "question": [
+            "¿Cuál era el dólar oficial el 31 de diciembre de 2023?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT usd_oficial FROM ${catalog}.gold.dim_fecha WHERE fecha = '2023-12-31'"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "889e6135a6f6003e3d528047ae9b4162",
+          "question": [
+            "¿Cuánto se acreditó en sueldos en 2025 en pesos?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT round(sum(importe_ars), 0) FROM ${catalog}.gold.fact_movimiento WHERE concepto = 'ACREDITACION_SUELDO' AND year(fecha_contable) = 2025"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "a418cdf144e05d4eba079499502a84ce",
+          "question": [
+            "¿Cuánto se pagó de resúmenes de tarjeta de crédito en 2025?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT round(-sum(importe_ars), 0) FROM ${catalog}.gold.fact_movimiento WHERE concepto = 'PAGO_TARJETA_CREDITO' AND year(fecha_contable) = 2025"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ac138808436ca5ab7f84b160dbf2a511",
+          "question": [
+            "Depósitos en dólares a fin de cada mes de 2025 (moneda original)"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT anio_mes, round(sum(saldo_moneda_original), 0) FROM ${catalog}.gold.mart_tesoreria_mensual WHERE moneda = 'USD' AND anio_mes LIKE '2025-%' GROUP BY anio_mes ORDER BY anio_mes"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "bdb46c80628e7d5574c8a507c1982ddd",
+          "question": [
+            "¿Cuál fue el flujo neto en pesos de 2024?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT round(sum(importe_ars), 0) FROM ${catalog}.gold.fact_movimiento WHERE year(fecha_contable) = 2024"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "cc5072127485f95987937adfadf295e7",
+          "question": [
+            "¿Cuántos depósitos en dólares había al 30 de junio de 2025?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT depositos_usd FROM ${catalog}.semantic.fn_posicion_dolares('2025-06-30')"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "d286ca1b4fd84487e20fb293df281f35",
+          "question": [
+            "¿Cuántos días hábiles no tuvieron cotización publicada?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT count(*) FROM ${catalog}.gold.dim_fecha WHERE es_dia_habil AND NOT cotizacion_publicada"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "e8851afe0896e9c8f67efe09564f1b41",
+          "question": [
+            "¿Qué porcentaje de los movimientos de 2026 fue por canales digitales?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT round(avg(CASE WHEN canal_digital THEN 1.0 ELSE 0 END) * 100, 1) FROM ${catalog}.gold.fact_movimiento WHERE year(fecha_contable) = 2026"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "e9754f23fbb3f5a49315b182cf80696b",
+          "question": [
+            "¿Cuántos movimientos hubo en 2025?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT count(*) FROM ${catalog}.gold.fact_movimiento WHERE year(fecha_contable) = 2025"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

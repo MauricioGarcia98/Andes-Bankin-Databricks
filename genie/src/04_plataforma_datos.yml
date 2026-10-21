@@ -50,4 +50,34 @@ examples:
     sql: |
       SELECT regla, severidad, problema, filas_que_fallan, filas_totales, paso FROM ${catalog}.semantic.v_calidad
       WHERE run_id = (SELECT max_by(run_id, checked_at) FROM ${catalog}.semantic.v_calidad) ORDER BY paso, severidad
-benchmarks: []
+benchmarks:
+- q: ¿Cuántos archivos llegaron de los sistemas origen?
+  sql: SELECT count(*) FROM ${catalog}.semantic.v_archivos_recibidos
+- q: ¿Qué archivo llegó corrupto?
+  sql: SELECT archivo FROM ${catalog}.semantic.v_archivos_recibidos WHERE estado = 'CORRUPT'
+- q: ¿Qué archivo se rechazó por tener el mismo contenido que otro?
+  sql: SELECT archivo FROM ${catalog}.semantic.v_archivos_recibidos WHERE estado = 'DUPLICATE_CONTENT'
+- q: ¿Cuántas filas de datos aterrizaron en total?
+  sql: SELECT sum(filas) FROM ${catalog}.semantic.v_archivos_recibidos WHERE estado IN ('LANDED', 'EMPTY')
+- q: ¿Cuántas reglas de calidad se evaluaron en la última corrida?
+  sql: SELECT count(*) FROM ${catalog}.semantic.v_calidad WHERE run_id = (SELECT max_by(run_id, checked_at) FROM ${catalog}.semantic.v_calidad)
+- q: ¿Falló alguna regla bloqueante en la última corrida?
+  sql: SELECT count(*) FROM ${catalog}.semantic.v_calidad WHERE run_id = (SELECT max_by(run_id, checked_at) FROM ${catalog}.semantic.v_calidad) AND NOT paso
+- q: ¿Cuántos CUIT inválidos detectó la última corrida?
+  sql: SELECT filas_que_fallan FROM ${catalog}.semantic.v_calidad WHERE regla = 'cuit_valido' AND run_id = (SELECT max_by(run_id, checked_at) FROM ${catalog}.semantic.v_calidad)
+- q: ¿Cuántos movimientos faltantes se detectaron por saldo?
+  sql: SELECT count(*) FROM ${catalog}.silver.balance_breaks
+- q: ¿Cuántas filas hay en cuarentena?
+  sql: SELECT count(*) FROM ${catalog}.silver.quarantine
+- q: ¿Cuántos pedidos se hicieron a las APIs en total?
+  sql: SELECT count(*) FROM ${catalog}.semantic.v_api_llamadas
+- q: ¿Cuántos pedidos a las APIs fallaron?
+  sql: SELECT count(*) FROM ${catalog}.semantic.v_api_llamadas WHERE resultado <> 'OK'
+- q: ¿Cuántos rate limit (429) devolvió la API de tarjetas?
+  sql: SELECT count(*) FROM ${catalog}.semantic.v_api_llamadas WHERE status_code = 429
+- q: ¿Cuántos días de la API quedaron incompletos?
+  sql: SELECT count(*) FROM (SELECT resource, day, max_by(complete, checked_at) AS ok FROM ${catalog}.ops.api_reconciliation GROUP BY ALL) WHERE NOT ok
+- q: ¿Cuántas compras con débito del procesador no aparecen en el core?
+  sql: SELECT sum(solo_en_procesador) FROM ${catalog}.gold.mart_conciliacion_tarjetas
+- q: ¿Qué problema del catálogo tiene más filas afectadas en la última corrida?
+  sql: SELECT problema FROM ${catalog}.semantic.v_calidad WHERE run_id = (SELECT max_by(run_id, checked_at) FROM ${catalog}.semantic.v_calidad) AND problema <> '-' ORDER BY filas_que_fallan DESC LIMIT 1

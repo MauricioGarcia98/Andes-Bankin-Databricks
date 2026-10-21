@@ -44,4 +44,34 @@ examples:
     sql: |
       SELECT `Mes`, round(MEASURE(`Créditos (ARS)`), 0) AS acreditado_ars
       FROM ${catalog}.semantic.mv_movimientos WHERE `Concepto` = 'ACREDITACION_SUELDO' GROUP BY ALL ORDER BY `Mes`
-benchmarks: []
+benchmarks:
+- q: ¿Cuál era el dólar oficial el 31 de diciembre de 2023?
+  sql: SELECT usd_oficial FROM ${catalog}.gold.dim_fecha WHERE fecha = '2023-12-31'
+- q: ¿Cuál fue el dólar oficial más alto del período?
+  sql: SELECT max(usd_oficial) FROM ${catalog}.gold.dim_fecha
+- q: ¿Cuántos depósitos en dólares había al 30 de junio de 2025?
+  sql: SELECT depositos_usd FROM ${catalog}.semantic.fn_posicion_dolares('2025-06-30')
+- q: ¿Cuál es el stock de depósitos en pesos (todo valuado en pesos) al último fin de mes?
+  sql: SELECT round(sum(saldo_ars), 0) FROM ${catalog}.gold.fact_saldo_diario WHERE es_fin_de_mes AND fecha = (SELECT max(fecha) FROM ${catalog}.gold.fact_saldo_diario WHERE es_fin_de_mes)
+- q: ¿Cuántas cuentas en dólares tenían saldo al último fin de mes?
+  sql: SELECT count(*) FROM ${catalog}.gold.fact_saldo_diario WHERE es_fin_de_mes AND moneda = 'USD' AND fecha = (SELECT max(fecha) FROM ${catalog}.gold.fact_saldo_diario WHERE es_fin_de_mes)
+- q: ¿Cuánto se acreditó en sueldos en 2025 en pesos?
+  sql: SELECT round(sum(importe_ars), 0) FROM ${catalog}.gold.fact_movimiento WHERE concepto = 'ACREDITACION_SUELDO' AND year(fecha_contable) = 2025
+- q: ¿Cuánto se invirtió en plazos fijos en 2025?
+  sql: SELECT round(-sum(importe_ars), 0) FROM ${catalog}.gold.fact_movimiento WHERE concepto = 'CONSTITUCION_PLAZO_FIJO' AND year(fecha_contable) = 2025
+- q: ¿Qué segmento tiene más depósitos en pesos al último fin de mes?
+  sql: SELECT segmento FROM ${catalog}.gold.mart_tesoreria_mensual WHERE fecha = (SELECT max(fecha) FROM ${catalog}.gold.mart_tesoreria_mensual) GROUP BY segmento ORDER BY sum(saldo_ars) DESC LIMIT 1
+- q: ¿Cuántos movimientos hubo en 2025?
+  sql: SELECT count(*) FROM ${catalog}.gold.fact_movimiento WHERE year(fecha_contable) = 2025
+- q: ¿Cuál fue el flujo neto en pesos de 2024?
+  sql: SELECT round(sum(importe_ars), 0) FROM ${catalog}.gold.fact_movimiento WHERE year(fecha_contable) = 2024
+- q: ¿Cuánto se pagó de resúmenes de tarjeta de crédito en 2025?
+  sql: SELECT round(-sum(importe_ars), 0) FROM ${catalog}.gold.fact_movimiento WHERE concepto = 'PAGO_TARJETA_CREDITO' AND year(fecha_contable) = 2025
+- q: ¿Qué porcentaje de los movimientos de 2026 fue por canales digitales?
+  sql: SELECT round(avg(CASE WHEN canal_digital THEN 1.0 ELSE 0 END) * 100, 1) FROM ${catalog}.gold.fact_movimiento WHERE year(fecha_contable) = 2026
+- q: ¿Cuántos días hábiles no tuvieron cotización publicada?
+  sql: SELECT count(*) FROM ${catalog}.gold.dim_fecha WHERE es_dia_habil AND NOT cotizacion_publicada
+- q: ¿Cuántas veces subió el dólar oficial entre el 1 y el 31 de diciembre de 2023 (cociente)?
+  sql: SELECT round(max_by(usd_oficial, fecha) / min_by(usd_oficial, fecha), 2) FROM ${catalog}.gold.dim_fecha WHERE fecha BETWEEN '2023-12-01' AND '2023-12-31'
+- q: Depósitos en dólares a fin de cada mes de 2025 (moneda original)
+  sql: SELECT anio_mes, round(sum(saldo_moneda_original), 0) FROM ${catalog}.gold.mart_tesoreria_mensual WHERE moneda = 'USD' AND anio_mes LIKE '2025-%' GROUP BY anio_mes ORDER BY anio_mes
