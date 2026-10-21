@@ -29,3 +29,15 @@ def cfg(tmp_path, spark):
     c = replace(local_config(str(tmp_path / "volume")), schema_prefix=prefix)
     create_namespace(spark, c)
     return c
+
+
+@pytest.fixture(scope="session")
+def truth(spark, tmp_path_factory):
+    """La verdad del banco a 1.000 clientes, generada una sola vez para todos los tests."""
+    from andes_bank.generator.truth import generate_truth
+    from andes_bank.setup import create_namespace
+
+    c = replace(local_config(str(tmp_path_factory.mktemp("vol")), scale_factor=0.002), schema_prefix="truth_")
+    create_namespace(spark, c)
+    counts = generate_truth(spark, c)
+    return c, counts

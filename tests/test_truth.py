@@ -3,23 +3,9 @@
 import pytest
 from pyspark.sql import functions as F
 
-from andes_bank.generator.truth import generate_truth
 from andes_bank.utils.ids import cbu_valid_col, cuit_valid_col
 
 pytestmark = pytest.mark.spark
-
-
-@pytest.fixture(scope="module")
-def truth(spark, tmp_path_factory):
-    from dataclasses import replace
-
-    from andes_bank.config import local_config
-    from andes_bank.setup import create_namespace
-
-    cfg = replace(local_config(str(tmp_path_factory.mktemp("vol")), scale_factor=0.002), schema_prefix="truth_")
-    create_namespace(spark, cfg)
-    counts = generate_truth(spark, cfg)
-    return cfg, counts
 
 
 def t(spark, cfg, name):
