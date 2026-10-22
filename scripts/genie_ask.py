@@ -26,7 +26,7 @@ def ask(slug: str, question: str, target: str = "dev", timeout: int = 180) -> di
         if m["status"] in ("COMPLETED", "FAILED", "CANCELLED") or time.time() - t0 > timeout:
             break
         time.sleep(3)
-    out = {"status": m["status"], "text": None, "sql": None, "rows": None}
+    out = {"status": m["status"], "text": None, "sql": None, "rows": None, "all_rows": None}
     for a in m.get("attachments") or []:
         if a.get("text"):
             out["text"] = a["text"].get("content")
@@ -34,7 +34,8 @@ def ask(slug: str, question: str, target: str = "dev", timeout: int = 180) -> di
             out["sql"] = a["query"].get("query")
             r = w.api_client.do("GET", f"/api/2.0/genie/spaces/{space}/conversations/{conv}/messages/{mid}"
                                        f"/attachments/{a['attachment_id']}/query-result")
-            out["rows"] = (r.get("statement_response", {}).get("result", {}) or {}).get("data_array", [])[:5]
+            out["all_rows"] = (r.get("statement_response", {}).get("result", {}) or {}).get("data_array", []) or []
+            out["rows"] = out["all_rows"][:5]
             out["text"] = out["text"] or a["query"].get("description")
     if m.get("error"):
         out["error"] = m["error"]
@@ -43,4 +44,5 @@ def ask(slug: str, question: str, target: str = "dev", timeout: int = 180) -> di
 
 if __name__ == "__main__":
     res = ask(sys.argv[1], sys.argv[2])
+    res.pop("all_rows", None)
     print(json.dumps(res, ensure_ascii=False, indent=2))

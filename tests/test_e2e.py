@@ -152,7 +152,7 @@ def test_gold_y_gate(spark, lake):
     fecha = t(spark, cfg, "gold", "dim_fecha")
     assert fecha.where("usd_oficial IS NULL AND fecha >= '2023-01-02'").count() == 0          # DAT-13
     c360 = t(spark, cfg, "gold", "mart_cliente_360")
-    assert c360.count() == t(spark, cfg, "gold", "dim_cliente").where("is_current").count()
+    assert c360.count() == t(spark, cfg, "gold", "dim_cliente").where("is_current AND estado = 'ACTIVO'").count()
     results = gate(spark, cfg, "e2e")
     assert all(r["passed"] for r in results)
     warn = {r["rule"]: r["failed_rows"] for r in results if r["severity"] == "warn"}

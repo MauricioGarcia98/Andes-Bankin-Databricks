@@ -20,7 +20,8 @@ def _g(spark: SparkSession, cfg: ProjectConfig, name: str) -> DataFrame:
 
 def mart_cliente_360(spark: SparkSession, cfg: ProjectConfig) -> DataFrame:
     end = F.lit(cfg.end_date.isoformat()).cast("date")
-    cli = _g(spark, cfg, "dim_cliente").where("is_current")
+    # "vigente" = versión actual y en estado ACTIVO: los dados de baja no son clientes (y Genie los cuenta mal si están)
+    cli = _g(spark, cfg, "dim_cliente").where("is_current AND estado = 'ACTIVO'")
     cuentas = (_g(spark, cfg, "dim_cuenta").where("estado = 'ACTIVO'").groupBy("cliente_id").agg(
         F.count("*").alias("cuentas_activas"),
         F.max(F.when(F.col("tipo_cuenta") == "CA_USD", 1).otherwise(0)).cast("boolean").alias("tiene_caja_usd"),

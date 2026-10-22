@@ -69,13 +69,14 @@
             "Sos el asistente del equipo de datos de Andes Bank. Respondés sobre la OPERACIÓN del lakehouse, no sobre el negocio.\n",
             "- Pedidos a las APIs: semantic.v_api_llamadas (una fila por pedido HTTP, incluidos los reintentos). resultado:\n",
             "  OK, RATE_LIMIT (429), TOKEN_VENCIDO (401), ERROR_SERVIDOR (5xx), TIMEOUT_O_RED, RESPUESTA_INVALIDA (JSON roto o 200 con error).\n",
+            "  De qué API es cada pedido: columna api (tarjetas, crm, espejo BCRA, token); recurso es el endpoint dentro de la API.\n",
             "- Para \"cómo están las APIs\" o \"salud de la ingesta\" usá fn_salud_ingesta(<días>).\n",
             "- Días incompletos de la API: ops.api_reconciliation (expected vs received; complete). Un día puede tener varias filas\n",
             "  (una por intento); el estado vigente es el último checked_at.\n",
             "- Archivos recibidos de los sistemas origen y qué se hizo con cada uno: semantic.v_archivos_recibidos (estado LANDED,\n",
             "  EMPTY, CORRUPT, DUPLICATE_CONTENT, CHANGED).\n",
             "- Calidad: semantic.v_calidad. severidad 'fail' frena la publicación; 'warn' es suciedad conocida que se mide.\n",
-            "  \"La última corrida\" = el run_id con el checked_at máximo.\n",
+            "  \"La última corrida\" = el run_id con el checked_at máximo. Para una regla puntual filtrá por regla (ej. cuit_valido).\n",
             "- Movimientos que el core nunca mandó: silver.balance_breaks (se detectan porque el saldo no cierra).\n",
             "- Filas descartadas con su motivo: silver.quarantine.\n",
             "- Los códigos de problema (DAT-01, API-06, ING-03...) son los del catálogo docs/03_catalogo_de_problemas.md."
@@ -267,7 +268,7 @@
             {
               "format": "SQL",
               "content": [
-                "SELECT count(*) FROM ${catalog}.semantic.v_api_llamadas WHERE status_code = 429 AND recurso IN ('autorizaciones', 'liquidaciones')"
+                "SELECT count(*) FROM ${catalog}.semantic.v_api_llamadas WHERE status_code = 429 AND api = 'tarjetas'"
               ]
             }
           ]

@@ -1,6 +1,6 @@
 # Diagramas del proyecto
 
-Un diagrama por fase, dibujados con [Excalidraw](https://excalidraw.com). Cada uno está en dos formatos:
+Un diagrama por fase (00 a 07) y uno por concepto clave (08 a 16), dibujados con [Excalidraw](https://excalidraw.com). Cada uno está en dos formatos:
 
 - **`.excalidraw`**: el original, editable. Abrilo en <https://excalidraw.com> (*Abrir* → elegí el archivo) o con la
   extensión de Excalidraw para VS Code.
@@ -16,6 +16,15 @@ Un diagrama por fase, dibujados con [Excalidraw](https://excalidraw.com). Cada u
 | 05 | [Semántica y Genie](#05--capa-semántica-y-genie) | gobierno, vistas, métricas, funciones y los 4 agents |
 | 06 | [Despliegue y jobs](#06--despliegue-ci-y-orquestación) | CI, Asset Bundles y las tareas de cada job |
 | 07 | [La API y el cliente](#07--la-api-con-caos-y-el-cliente) | cada falla inyectada y cómo se sobrevive |
+| 08 | [La historia del banco](#08--la-historia-del-banco) | cada hito (fusión, devaluación, migración, API v2) y la marca que deja en los datos |
+| 09 | [El generador](#09--el-generador) | entidades → eventos conectados → exportes sucios |
+| 10 | [El borde (landing)](#10--el-borde-landing) | qué pasa con cada archivo: LANDED, EMPTY, CORRUPT, DUPLICATE, CHANGED |
+| 11 | [Cargar sólo lo nuevo](#11--cargar-sólo-lo-nuevo) | checkpoints y watermarks de cada fuente |
+| 12 | [R14: el día incompleto](#12--r14-el-día-incompleto) | el bug que encontró el quality gate y cómo se arregló |
+| 13 | [SCD2 e identidad](#13--scd2-e-identidad) | historia de clientes y la fusión de 2008 |
+| 14 | [El modelo estrella](#14--el-modelo-estrella) | hechos, dimensiones y marts de gold |
+| 15 | [La pirámide de Genie](#15--la-pirámide-de-genie) | qué hace que Genie responda bien y qué arreglar primero |
+| 16 | [Operar con el caos](#16--operar-con-el-caos) | qué mirar y qué hacer cuando falla cada tarea del job diario |
 | 99 | [Íconos disponibles](#99--íconos-disponibles) | los íconos de la biblioteca de Excalidraw que usan los diagramas |
 
 ## Cómo se regeneran
@@ -84,6 +93,42 @@ texto y, si no entra, arriba. Para sumar uno, agregalo a `ICONOS` en `bajar_icon
 ## 07 · La API con caos y el cliente
 
 ![La API y el cliente](07_api_caos_cliente.svg)
+
+## 08 · La historia del banco
+
+![La historia del banco](08_linea_de_tiempo.svg)
+
+## 09 · El generador
+
+![El generador](09_generador.svg)
+
+## 10 · El borde (landing)
+
+![El borde (landing)](10_landing_borde.svg)
+
+## 11 · Cargar sólo lo nuevo
+
+![Cargar sólo lo nuevo](11_incremental.svg)
+
+## 12 · R14: el día incompleto
+
+![R14: el día incompleto](12_dia_incompleto_r14.svg)
+
+## 13 · SCD2 e identidad
+
+![SCD2 e identidad](13_scd2_identidad.svg)
+
+## 14 · El modelo estrella
+
+![El modelo estrella](14_modelo_estrella.svg)
+
+## 15 · La pirámide de Genie
+
+![La pirámide de Genie](15_piramide_genie.svg)
+
+## 16 · Operar con el caos
+
+![Operar con el caos](16_operacion.svg)
 
 ## 99 · Íconos disponibles
 

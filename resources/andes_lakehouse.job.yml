@@ -7,6 +7,14 @@ resources:
       description: "Pipeline medallion de Andes Bank: core (Blob), procesador de tarjetas y CRM (API), BCRA, gold y quality gate"
       max_concurrent_runs: 1
       timeout_seconds: 14400
+      # corrida diaria a las 7 (hora argentina): todo es incremental (watermarks y Auto Loader), así que si no llegó
+      # nada nuevo termina rápido; el quality gate igual vuelve a controlar gold
+      schedule:
+        quartz_cron_expression: "0 0 7 * * ?"
+        timezone_id: America/Argentina/Buenos_Aires
+        pause_status: UNPAUSED
+      email_notifications:
+        on_failure: ["${workspace.current_user.userName}"]
       tags:
         project: andes-bank
         layer: all
