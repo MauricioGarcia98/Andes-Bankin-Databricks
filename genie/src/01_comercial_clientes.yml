@@ -28,7 +28,7 @@ instructions: |
   - Para la ficha de un cliente puntual usá fn_resumen_cliente('<cliente_id>').
   - DNI, CUIT, email y teléfono pueden salir enmascarados según los permisos del usuario: no es un error.
   - Cada usuario ve sólo las regiones que tiene asignadas (filtro de fila): si faltan regiones, es por permisos.
-  - CRM (Salesforce, desde jun-2024): oportunidades en gold.fact_oportunidad, reclamos y consultas en gold.fact_caso,
+  - CRM comercial (desde jun-2024): oportunidades en gold.fact_oportunidad, reclamos y consultas en gold.fact_caso,
     cuentas del CRM en gold.dim_cuenta_crm. Se unen al core por persona_id. "Pipeline" = oportunidades abiertas
     (cerrada = false); "ganado" = ganada = true. Las cuentas duplicadas del CRM ya están unificadas en cuenta_principal_id:
     contá empresas con COUNT(DISTINCT cuenta_principal_id), nunca contando filas de dim_cuenta_crm.

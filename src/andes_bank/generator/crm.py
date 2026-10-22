@@ -1,11 +1,15 @@
-"""Los datos del CRM (Salesforce): cuentas, contactos, leads, oportunidades y casos.
+"""Los datos del CRM comercial: cuentas, contactos, leads, oportunidades y casos.
 
-Salesforce NO escala con el scale factor: una org gratuita tiene ~5 MB de datos (≈ 2 KB por registro), así que el
-CRM tiene siempre ~1.900 registros. Se arma en Python puro (es chico) a partir de una muestra fija de clientes de
-`sim.customers`, con una semilla: la misma muestra y la misma suciedad cada vez.
+El CRM es un sistema origen simulado con el modelo de datos de Salesforce (Account, Contact, Lead, Opportunity, Case,
+campos custom `__c`, `Id`, `SystemModstamp`, `IsDeleted`). Lo sirve la API de Azure (`/crm/v1/<Objeto>`) a partir de
+`crm-data/<Objeto>.json`, que arma `crm_system` y sube el notebook 05.
 
-Cada registro trae `Andes_Key__c`, la clave externa de carga: permite hacer *upsert* (re-cargar no duplica) y
-relacionar hijos con padres sin conocer los Id de Salesforce. Las columnas `_true_*` son la verdad (no se cargan).
+El CRM NO escala con el scale factor: tiene siempre ~1.900 registros (lo que carga a mano el equipo comercial de un
+banco regional). Se arma en Python puro (es chico) a partir de una muestra fija de clientes de `sim.customers`, con
+una semilla: la misma muestra, la misma suciedad y los mismos Id y fechas cada vez.
+
+Cada registro trae `Andes_Key__c`, la clave de carga, y los hijos apuntan a su cuenta con `Account.Andes_Key__c`;
+`crm_system` lo traduce a los `Id` y `AccountId` del CRM. Las columnas `_true_*` son la verdad (no se publican).
 
 Suciedad (docs/03):
   * DAT-09 `Core_Customer_Id__c` vacío (12 %), con el número del banco viejo (6 %) o con dos dígitos cambiados (4 %).
@@ -19,7 +23,7 @@ from __future__ import annotations
 
 import random
 import unicodedata
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
@@ -166,7 +170,7 @@ def crm_records(customers: list[dict], seed: int) -> dict[str, list[dict]]:
 
     # --------------------------------------------------------------------------------- oportunidades
     real_accounts = [a for a in accounts if a["_dirt"] != "DUPLICADA"]
-    start = ref.SALESFORCE_GO_LIVE
+    start = ref.CRM_GO_LIVE
     for i in range(1, N_OPPORTUNITIES + 1):
         a = r.choice(real_accounts)
         product = r.choice(list(PRODUCTS))
@@ -211,17 +215,91 @@ def crm_sample(spark: SparkSession, cfg: ProjectConfig) -> list[dict]:
 
 
 def generate_crm(spark: SparkSession, cfg: ProjectConfig) -> dict[str, int]:
-    """Escribe el CRM en `sim.crm_<objeto>` (columnas de Salesforce + verdad). La carga a Salesforce la hace
-    `andes_bank.salesforce.seed` leyendo estas tablas."""
+    """Escribe el CRM en `sim.crm_<objeto>` (columnas del CRM + verdad). `crm_state` lo lee de acá para publicarlo."""
     recs = crm_records(crm_sample(spark, cfg), cfg.seed)
     counts = {}
     for obj, rows in recs.items():
         keys = sorted({k for row in rows for k in row})
         data = [tuple(None if row.get(k) is None else str(row[k]) for k in keys) for row in rows]
         # "Account.Andes_Key__c" (relación por clave externa) se guarda como Account_Andes_Key__c: Spark no admite
-        # puntos en los nombres de columna; seed.sf_rows lo vuelve a la sintaxis de Salesforce
+        # puntos en los nombres de columna; crm_state lo vuelve a la sintaxis original
         schema = ", ".join(f"`{k.replace('.', '_')}` string" for k in keys)
         spark.createDataFrame(data, schema).write.mode("overwrite").option("overwriteSchema", "true") \
             .saveAsTable(cfg.table("sim", f"crm_{obj}"))
         counts[obj] = len(rows)
     return counts
+
+
+# ------------------------------------------------------------------------------------- el sistema CRM
+OBJECTS = {"accounts": "Account", "contacts": "Contact", "leads": "Lead", "opportunities": "Opportunity",
+           "cases": "Case"}
+ID_PREFIX = {"Account": "001", "Contact": "003", "Lead": "00Q", "Opportunity": "006", "Case": "500"}
+
+
+def _crm_ts(ts: datetime) -> str:
+    return ts.strftime("%Y-%m-%dT%H:%M:%S.000+0000")
+
+
+def crm_system(records: dict[str, list[dict]], seed: int, end: date) -> dict[str, list[dict]]:
+    """Lo que "tiene adentro" el CRM: cada registro con su `Id`, `CreatedDate`, `SystemModstamp`, `IsDeleted` y los
+    campos que calcula el sistema (`IsClosed`, `IsWon`, `CaseNumber`, `ClosedDate`, `IsConverted`).
+
+    `records` es la salida de `crm_records` (o lo leído de `sim.crm_*`). Sin columnas `_*`. Ids y fechas salen de la
+    semilla: publicar dos veces da exactamente lo mismo, y la ingesta incremental no ve cambios que no hubo.
+    """
+    r = random.Random(seed * 11 + 5)
+    go_live = datetime.combine(ref.CRM_GO_LIVE, time(9), tzinfo=timezone.utc)
+    last = datetime.combine(end, time(21), tzinfo=timezone.utc)
+    span = int((last - go_live).total_seconds())
+
+    def created_after(t0: datetime) -> datetime:
+        return t0 + timedelta(seconds=r.randrange(max(1, int((last - t0).total_seconds()))))
+
+    def modified(t0: datetime) -> datetime:
+        return min(last, t0 + timedelta(hours=r.choice([0, 0, 1, 26, 24 * 9, 24 * 40])))
+
+    out: dict[str, list[dict]] = {}
+    created_by_key: dict[str, datetime] = {}
+    id_by_key: dict[str, str] = {}
+    for key, obj in OBJECTS.items():
+        rows = []
+        for rec in records.get(key, []):
+            rec = {k: v for k, v in rec.items() if not k.startswith("_") and v is not None}
+            n = int(rec["Andes_Key__c"].split("-")[1])
+            parent = rec.pop("Account.Andes_Key__c", None) or rec.pop("Account_Andes_Key__c", None)
+            t0 = created_after(created_by_key[parent]) if parent else go_live + timedelta(seconds=r.randrange(span))
+            if obj == "Opportunity" and rec.get("CloseDate"):
+                close = datetime.combine(date.fromisoformat(rec["CloseDate"]), time(18), tzinfo=timezone.utc)
+                t0 = max(t0, min(last, close) - timedelta(days=r.randrange(10, 120)))
+            t1 = modified(t0)
+            row = {"Id": f"{ID_PREFIX[obj]}{n:015d}", "IsDeleted": False, "CreatedDate": _crm_ts(t0), **rec}
+            if parent:
+                row["AccountId"] = id_by_key[parent]
+            if obj == "Opportunity":
+                row["Amount"] = float(rec["Amount"]) if rec.get("Amount") else None
+                row["IsClosed"] = rec["StageName"].startswith("Closed")
+                row["IsWon"] = rec["StageName"] == "Closed Won"
+            if obj == "Lead":
+                row["IsConverted"] = False
+            if obj == "Case":
+                row["CaseNumber"] = f"{n:08d}"
+                row["IsClosed"] = rec["Status"] == "Closed"
+                closed = min(last, t0 + timedelta(hours=r.uniform(2, 240))) if row["IsClosed"] else None
+                row["ClosedDate"] = _crm_ts(closed) if closed else None
+                t1 = max(t1, closed or t1)
+            row["SystemModstamp"] = _crm_ts(t1)
+            created_by_key[rec["Andes_Key__c"]] = t0
+            id_by_key[rec["Andes_Key__c"]] = row["Id"]
+            rows.append(row)
+        out[obj] = rows
+    return out
+
+
+def crm_state(spark: SparkSession, cfg: ProjectConfig) -> dict[str, list[dict]]:
+    """El CRM publicado, a partir de `sim.crm_*` (escrito por `generate_crm`)."""
+    records = {}
+    for key in OBJECTS:
+        df = spark.table(cfg.table("sim", f"crm_{key}"))
+        cols = [c for c in df.columns if not c.startswith("_")]
+        records[key] = sorted((row.asDict() for row in df.select(*cols).collect()), key=lambda x: x["Andes_Key__c"])
+    return crm_system(records, cfg.seed, cfg.end_date)

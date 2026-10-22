@@ -95,3 +95,35 @@ class MemoryFxStore:
 
     def series(self, currency: str):
         return self.data.get(currency)
+
+
+class BlobCrmStore:  # pragma: no cover - se prueba contra Azure
+    """Estado del CRM comercial: crm-data/<Objeto>.json (todos los registros del objeto, borrados incluidos). Lo sube
+    el job de fuentes (notebook 05)."""
+
+    def __init__(self, connection_string: str, container: str = "crm-data"):
+        from azure.storage.blob import BlobServiceClient
+
+        self.client = BlobServiceClient.from_connection_string(connection_string).get_container_client(container)
+        self._cache: dict[str, tuple[float, list]] = {}
+
+    def records(self, obj: str):
+        import time
+
+        cached = self._cache.get(obj)
+        if cached and time.time() - cached[0] < 600:
+            return cached[1]
+        try:
+            data = json.loads(self.client.download_blob(f"{obj}.json").readall())
+        except Exception:
+            data = None
+        self._cache[obj] = (time.time(), data)
+        return data
+
+
+class MemoryCrmStore:
+    def __init__(self, data: dict[str, list[dict]]):
+        self.data = data
+
+    def records(self, obj: str):
+        return self.data.get(obj)

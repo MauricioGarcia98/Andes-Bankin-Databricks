@@ -1,6 +1,6 @@
-"""SILVER del CRM (Salesforce): parseo, match con el core, duplicados y PII.
+"""SILVER del CRM comercial: parseo, match con el core, duplicados y PII.
 
-Match de una cuenta de Salesforce con el cliente del core (DAT-09), en orden:
+Match de una cuenta del CRM con el cliente del core (DAT-09), en orden:
   1. `ID_CORE`: `Core_Customer_Id__c` existe en el core y su CUIT no contradice el de la cuenta.
   2. `CUIT`: el CUIT de la cuenta (sin guiones) es el de un cliente del core. Cubre el ID vacío, el número del banco
      viejo (`MZA…`) y el ID con dígitos cambiados.
@@ -18,7 +18,7 @@ from pyspark.sql import functions as F
 from pyspark.sql import types as T
 
 from andes_bank.config import ProjectConfig
-from andes_bank.ingestion.bronze_salesforce import AUDIT, OBJECTS
+from andes_bank.ingestion.bronze_crm import AUDIT, OBJECTS
 from andes_bank.silver.transforms import has_pii, normalize_name, only_digits, redact_pii
 
 NUMERIC = {"Amount"}

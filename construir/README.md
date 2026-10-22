@@ -1,6 +1,6 @@
 # 🛠️ Construilo vos: Andes Bank desde un repo vacío
 
-> **Qué es esto:** el curso para **borrar todo** (Databricks, Azure, Salesforce y el repo) y **volver a construir el
+> **Qué es esto:** el curso para **borrar todo** (Databricks, Azure y el repo) y **volver a construir el
 > proyecto vos solo**, archivo por archivo y en el orden en que se construyó. Cada bloque de código se explica: **qué
 > hace, por qué se hizo así y no de otra forma, qué va a fallar y cómo se arregla**. Los "🔥 Si falla" salen de la
 > [bitácora](../docs/08_bitacora.md): son errores que **pasaron de verdad** mientras se construía.
@@ -8,7 +8,7 @@
 ## Para quién es
 
 Para alguien que programa un poco (funciones de Python, un `SELECT` con `GROUP BY`) y quiere aprender en serio
-**Databricks Free Edition**, **Azure**, **Salesforce** y **Genie**, con un problema que se parece al de un banco real.
+**Databricks Free Edition**, **Azure** y **Genie**, con un problema que se parece al de un banco real.
 
 ## Qué vas a saber hacer al terminar
 
@@ -17,7 +17,7 @@ Para alguien que programa un poco (funciones de Python, un `SELECT` con `GROUP B
   - Blob Storage con los archivos del core;
   - una API en Azure Functions con OAuth, paginación por cursor y **caos**;
   - la API pública del BCRA;
-  - una org de Salesforce.
+  - un CRM servido por la misma API, con incremental y borrados.
 - Escribir un cliente de API que no se rompe: reintentos, *backoff*, renovación de token y conciliación contra totales.
 - Construir el medallion completo:
   - Auto Loader con dos contratos y *schema drift*;
@@ -47,12 +47,12 @@ Para alguien que programa un poco (funciones de Python, un `SELECT` con `GROUP B
 | 08 | Azure con `az`: Storage, Function App, SAS y teardown | `etapa-05` | 2 h |
 | 09 | La API de tarjetas: OAuth, cursor, v1/v2 y caos | `etapa-06` | 4 h |
 | 10 | El espejo de FX y la API real del BCRA | `etapa-07` | 1 h 30 |
-| 11 | Salesforce: la org, campos custom por API y carga con Bulk 2.0 | `etapa-08` | 2 h |
+| 11 | [El CRM comercial: generarlo y publicarlo en la API](11_crm.md) | `etapa-08` | 2 h |
 | **Parte 2 · Ingesta** | | | |
 | 12 | Landing: de Blob al Volume, con validación en el borde ([ADR 0002](../docs/adr/0002_landing_sync_blob_a_volume.md)) | `etapa-09` | 2 h |
 | 13 | Bronze de archivos con Auto Loader (dos contratos) | `etapa-09` | 2 h |
 | 14 | El cliente de API robusto | `etapa-10` | 4 h |
-| 15 | Bronze de tarjetas, FX y Salesforce | `etapa-11` | 3 h |
+| 15 | Bronze de tarjetas, FX y CRM | `etapa-11` | 3 h |
 | **Parte 3 · Transformación** | | | |
 | 16 | Silver I: limpiar (números argentinos, monedas, husos, PII) | `etapa-12` | 3 h |
 | 17 | Silver II: identidad, SCD2, conciliación y CRM | `etapa-13` | 3 h |
@@ -89,6 +89,6 @@ Total: unas **55-60 horas**.
 - **Escribí el código vos.** Copiar y pegar no enseña; usá el tag para comparar, no para copiar.
 - **Nada de secretos en el repo ni en un chat.** Las credenciales van en variables de entorno, en el secret scope
   `andes_bank` y en la configuración de la Function App.
-- **Cuidá el presupuesto.** Todo el proyecto cuesta centavos por mes en Azure y USD 0 en Databricks y Salesforce. Si
+- **Cuidá el presupuesto.** Todo el proyecto cuesta centavos por mes en Azure y USD 0 en Databricks. Si
   ves otra cosa, pará y revisá (capítulo 08).
 - **Los tests primero.** Cada etapa se prueba en local (Spark + Delta) antes de subirla a Databricks.

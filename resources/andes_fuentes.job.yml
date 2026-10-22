@@ -1,10 +1,10 @@
 # Job "fuentes": simula los sistemas origen del banco. No es parte del lakehouse: es el "mundo exterior".
-# genera la verdad → la exporta sucia → la sube a Azure (en paralelo: copia el BCRA real al espejo y carga Salesforce).
+# genera la verdad → la exporta sucia → la sube a Azure (en paralelo: copia el BCRA real al espejo y publica el CRM).
 resources:
   jobs:
     andes_fuentes:
       name: andes-bank-fuentes
-      description: Simula los sistemas origen de Andes Bank (core, procesador de tarjetas) y los sube a Azure
+      description: Simula los sistemas origen de Andes Bank (core, procesador de tarjetas, CRM) y los sube a Azure
       max_concurrent_runs: 1
       timeout_seconds: 10800
       tags:
@@ -44,8 +44,8 @@ resources:
           min_retry_interval_millis: 60000
           notebook_task:
             notebook_path: ../notebooks/04_fx_mirror.py
-        - task_key: salesforce_seed
+        - task_key: crm_publish
           depends_on: [{ task_key: generate_truth }]
           max_retries: 1
           notebook_task:
-            notebook_path: ../notebooks/05_salesforce_seed.py
+            notebook_path: ../notebooks/05_crm_publish.py

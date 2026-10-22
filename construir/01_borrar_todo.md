@@ -12,15 +12,14 @@ El orden importa. Primero se borra lo que **depende** de otra cosa y al final lo
 3. El catálogo.
 4. Los secretos.
 5. Azure.
-6. Salesforce.
-7. El repo.
+6. El repo.
 
 Si borrás Azure antes que los jobs, el job diario va a seguir intentando leer un Storage que ya no existe y te va a
 llenar el mail de fallas.
 
 ## 📚 Conceptos
 
-- **Lo que cuesta plata es sólo Azure.** Databricks Free Edition y la org de Salesforce son gratis; igual se borran
+- **Lo que cuesta plata es sólo Azure.** Databricks Free Edition es gratis; igual se borra
   para empezar de cero de verdad.
 - **Borrar un resource group borra todo lo que tiene adentro**: Storage, Function App y Application Insights. Es la
   forma más segura de no olvidarse de nada.
@@ -85,7 +84,7 @@ Loader "se acuerda" de los archivos viejos y no lee los nuevos.
 databricks secrets delete-scope andes_bank
 ```
 
-Contiene las SAS de Blob, el client id/secret de la API y las credenciales de Salesforce. Las SAS dejan de servir igual
+Contiene las SAS de Blob, el client id/secret de la API (y, si los cargaste en una versión vieja, los `sf_*` de Salesforce). Las SAS dejan de servir igual
 cuando borrás el Storage, pero no dejes secretos colgados.
 
 ### 5. Azure
@@ -105,17 +104,7 @@ Revisá también:
 - **Costos:** *Cost Management → Análisis de costos* al día siguiente. Tiene que aparecer el gasto del mes (centavos) y
   nada nuevo después del borrado.
 
-### 6. Salesforce
-
-- **Developer Edition:** no hace falta darla de baja; si no entrás por un tiempo largo, Salesforce la desactiva sola.
-  Para empezar de cero de verdad, creá una org nueva en la reconstrucción.
-- **Prueba de 30 días:** vence sola.
-- Si querés limpiar la misma org: *Setup → Object Manager* → borrá los campos `Andes_Key__c`, `Core_Customer_Id__c`,
-  `CUIT__c`, `Segmento__c` y `Producto__c`, y *Setup → Permission Sets* → `Andes Integracion`. Los datos se borran con
-  *Setup → Mass Delete Records*.
-- Rotá el token de seguridad: *Configuración → Restablecer mi token de seguridad*.
-
-### 7. El repo nuevo
+### 6. El repo nuevo
 
 ```bash
 mkdir ~/andes-bank && cd ~/andes-bank && git init -b main

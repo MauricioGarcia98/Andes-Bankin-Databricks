@@ -14,7 +14,7 @@
 | 2019 | Cepo cambiario: cuentas en USD con restricciones, "dólar oficial" vs. otros tipos de cambio. | Movimientos en ARS y USD mezclados; el tipo de cambio aplicado no siempre se informa. |
 | 2022 | **Migración del core bancario** a un sistema nuevo. | Antes de jul-2022 los archivos vienen en `latin1` con `;` y `dd/MM/yyyy`; después, UTF-8 con `,` e ISO. Saldos iniciales cargados con un movimiento "AJUSTE MIGRACION". |
 | 2023 | Devaluación del 13 de diciembre (el oficial pasa de ~366 a ~800). | Montos en ARS que se multiplican; los reportes en USD cambian de golpe. |
-| 2024 | Pasa del CRM casero a **Salesforce**. | Cuentas de Salesforce sin el ID del core; el *match* se hace por CUIT/DNI, con errores. |
+| 2024 | Pasa del CRM casero a un **CRM comercial nuevo** (modelo de Salesforce). | Cuentas del CRM sin el ID del core; el *match* se hace por CUIT/DNI, con errores. |
 | 2025 | El procesador de tarjetas publica la **API v2** (paginación por cursor, campos nuevos). | Conviven v1 (offset) y v2 (cursor) durante 3 meses: *schema drift* y duplicados. |
 | 2026 | Auditoría del BCRA sobre **protección de datos** y conciliación de saldos. | Se exige enmascarar PII y explicar cada diferencia de saldo. |
 

@@ -1,1 +1,1 @@
-"""Ingesta: de los sistemas origen (Azure Blob, la API del procesador, el BCRA, Salesforce) a bronze."""
+"""Ingesta: de los sistemas origen (Azure Blob, la API del procesador, el BCRA, el CRM) a bronze."""

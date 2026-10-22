@@ -4,6 +4,7 @@
                   movimientos/2025/08/15/MOVIMIENTOS_20250812.csv.gz  (el archivo del 12 que llegó el 15)
     cards-legacy  autorizaciones/2024/01/10/autorizaciones_20240110.json
     api-data      authorizations/2025/07/15/page-00001.json + _manifest.json   (lo que sirve la Function)
+    crm-data      Account.json, Contact.json...   (el estado del CRM, que la Function sirve en /crm/v1/<Objeto>)
 
 Acá también se "rompen" los archivos de los incidentes de entrega que no se pueden armar con Spark:
   ING-02  el archivo vacío (sólo encabezado) y su _REENVIO del día siguiente
@@ -13,6 +14,7 @@ Acá también se "rompen" los archivos de los incidentes de entrega que no se pu
 
 from __future__ import annotations
 
+import contextlib
 import gzip
 import io
 import json
@@ -193,6 +195,31 @@ def upload_all(cfg: ProjectConfig, sas_token: str, start: date | None = None, en
         counts[part] = n
         log.info("%s: %d blobs subidos", part, n)
     return counts
+
+
+# ------------------------------------------------------------------------------------------------- CRM
+CRM_CONTAINER = "crm-data"
+
+
+def crm_uploads(state: dict[str, list[dict]]) -> Iterator[Upload]:
+    """Un JSON por objeto con TODOS sus registros (borrados incluidos): la API filtra por `SystemModstamp`."""
+    for obj, rows in state.items():
+        yield Upload(CRM_CONTAINER, f"{obj}.json", json.dumps(rows, ensure_ascii=False, separators=(",", ":")).encode())
+
+
+def upload_crm(cfg: ProjectConfig, sas_token: str, state: dict[str, list[dict]]) -> dict[str, int]:
+    """Publica el CRM. Siempre pisa: son ~2 MB y lo que importa adentro es el `SystemModstamp` de cada registro, no
+    el etag del archivo. Crea el contenedor si falta (la SAS de escritura puede crear contenedores)."""
+    from azure.core.exceptions import ResourceExistsError
+    from azure.storage.blob import BlobServiceClient
+
+    service = BlobServiceClient(account_url=f"https://{cfg.storage_account}.blob.core.windows.net", credential=sas_token)
+    container = service.get_container_client(CRM_CONTAINER)
+    with contextlib.suppress(ResourceExistsError):
+        container.create_container()
+    for u in crm_uploads(state):
+        container.upload_blob(u.name, u.data, overwrite=True)
+    return {obj: len(rows) for obj, rows in state.items()}
 
 
 # ------------------------------------------------------------------------------------------- espejo FX

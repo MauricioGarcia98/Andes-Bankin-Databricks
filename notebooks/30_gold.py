@@ -17,5 +17,5 @@ from andes_bank.gold.model import build_gold
 
 out = build_gold(spark, cfg)
 out.update(build_marts(spark, cfg))
-out.update(build_crm_gold(spark, cfg))  # vacío si todavía no hay Salesforce
+out.update(build_crm_gold(spark, cfg))  # vacío si todavía no se publicó el CRM
 display(spark.createDataFrame(list(out.items()), "tabla string, filas long"))

@@ -6,10 +6,9 @@
                    ┌────────────────────────── AZURE (pago por uso, tope USD 10) ─────────────────────────┐
   Generador ─────► │  Blob Storage  landing/core/...  (archivos del core)                                 │
   (corre en        │  Blob Storage  api-data/...      (lo que sirve la API, por día)                      │
-   Databricks)     │  Azure Functions  /v1 /v2 authorizations, settlements, fx-mirror  (+ caos)           │
+   Databricks)     │  Azure Functions  /v1 /v2 authorizations, settlements, fx-mirror, /crm/v1  (+ caos)  │
                    └──────────────────────────────────────────────────────────────────────────────────────┘
                                 │ archivos                 │ HTTP paginado
-  Salesforce (org gratuita) ────┼──────── REST/Bulk ───────┤
   API real del BCRA ────────────┼──────── HTTP ────────────┤
                                 ▼                          ▼
   ┌──────────────────────────── DATABRICKS FREE EDITION (Unity Catalog) ─────────────────────────────────┐
@@ -27,7 +26,7 @@
 Free Edition restringe el acceso saliente a internet hasta que verificás la cuenta con LinkedIn. Como vas a
 verificarla, **Databricks llama directamente a las APIs** (patrón *pull*), que es lo que hace un equipo de datos
 real. Igual el primer paso de la construcción (el *spike*) lo comprueba con un `curl` desde un notebook a cada
-dominio: Azure Functions, Blob, Salesforce y BCRA.
+dominio: Azure Functions, Blob y BCRA.
 
 **Plan B si algún dominio queda bloqueado:** una Azure Function con timer consume esa API y deja los archivos en
 Blob (*push*). Se documenta en un ADR y el resto del proyecto no cambia.
@@ -54,7 +53,6 @@ andes_bank (catálogo)
 |---|---|
 | **Azure CLI (`az`)** | crear el resource group, Storage, Function App, presupuesto y alertas; desplegar las Functions |
 | **Databricks CLI** | `bundle deploy`, correr jobs, crear secret scopes, subir archivos, desplegar Genie |
-| **Salesforce CLI (`sf`)** | crear el campo custom, cargar datos con Bulk API, consultar con SOQL |
 | **GitHub Actions** | lint, tests, `bundle validate` y deploy con aprobación |
 
 ## Costos (tope USD 10/mes)

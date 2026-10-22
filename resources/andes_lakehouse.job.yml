@@ -4,7 +4,7 @@ resources:
   jobs:
     andes_lakehouse:
       name: andes-bank-lakehouse
-      description: "Pipeline medallion de Andes Bank: core (Blob), procesador de tarjetas (API), BCRA, gold y quality gate"
+      description: "Pipeline medallion de Andes Bank: core (Blob), procesador de tarjetas y CRM (API), BCRA, gold y quality gate"
       max_concurrent_runs: 1
       timeout_seconds: 14400
       tags:
@@ -50,15 +50,15 @@ resources:
           min_retry_interval_millis: 120000
           notebook_task:
             notebook_path: ../notebooks/13_bronze_fx.py
-        - task_key: bronze_salesforce
+        - task_key: bronze_crm
           depends_on: [{ task_key: setup }]
           max_retries: 2
           min_retry_interval_millis: 120000
           notebook_task:
-            notebook_path: ../notebooks/14_bronze_salesforce.py
+            notebook_path: ../notebooks/14_bronze_crm.py
         - task_key: silver
           depends_on: [{ task_key: bronze_files }, { task_key: bronze_api }, { task_key: bronze_fx },
-                       { task_key: bronze_salesforce }]
+                       { task_key: bronze_crm }]
           notebook_task:
             notebook_path: ../notebooks/20_silver.py
         - task_key: gold

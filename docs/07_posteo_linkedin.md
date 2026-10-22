@@ -6,7 +6,7 @@
 ## Las preguntas centrales
 
 1. **¿Qué proyecto hice?** Un banco argentino simulado, de punta a punta en Databricks, con fuentes reales (APIs en
-   Azure, Salesforce, BCRA) y datos sintéticos.
+   Azure, BCRA) y datos sintéticos.
 2. **¿Por qué lo hice?** Para practicar con problemas reales y para exprimir Databricks Free Edition al máximo.
 3. **¿Cómo usé la IA?** Claude Code como acompañante: qué decidí yo, qué le pedí, qué corregí de lo que propuso y qué
    aprendí de sus explicaciones. No "la IA lo hizo".

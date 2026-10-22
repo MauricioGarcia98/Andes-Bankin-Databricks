@@ -1,4 +1,4 @@
-"""GOLD del CRM: la cuenta de Salesforce unida a la persona del core, oportunidades y casos.
+"""GOLD del CRM: la cuenta del CRM unida a la persona del core, oportunidades y casos.
 
 Las oportunidades y los casos de una cuenta duplicada se atribuyen a su cuenta principal: para Comercial, una
 empresa es una sola aunque dos ejecutivos la hayan cargado dos veces.

@@ -11,28 +11,26 @@ from datetime import date
 
 import pytest
 from fake_http import FakeSession
-from fake_salesforce import FakeSalesforce
 from pyspark.sql import functions as F
 
 from andes_bank.config import local_config
 from andes_bank.generator import reference as ref
-from andes_bank.generator.crm import generate_crm
+from andes_bank.generator.crm import crm_state, generate_crm
 from andes_bank.generator.exports import export_all
 from andes_bank.generator.truth import generate_truth
 from andes_bank.generator.upload import api_uploads, cards_legacy_uploads, core_uploads
 from andes_bank.gold.crm import build_crm_gold
 from andes_bank.gold.marts import build_marts
 from andes_bank.gold.model import build_gold
-from andes_bank.ingestion import bronze_api, bronze_files, bronze_salesforce
+from andes_bank.ingestion import bronze_api, bronze_crm, bronze_files
 from andes_bank.ingestion.api_client import ApiClient
 from andes_bank.ingestion.landing_sync import RemoteFile, run_sync
 from andes_bank.quality.gate import gate
-from andes_bank.salesforce.seed import seed_salesforce
 from andes_bank.setup import create_namespace
 from andes_bank.silver.load import load_all
 from api import CardApi, Settings  # noqa: E402
 from chaos import Chaos  # noqa: E402
-from store import MemoryFxStore, MemoryStore  # noqa: E402
+from store import MemoryCrmStore, MemoryFxStore, MemoryStore  # noqa: E402
 
 pytestmark = pytest.mark.spark
 
@@ -69,21 +67,25 @@ def lake(spark, tmp_path_factory):
             pages.setdefault((resource, f"{y}-{m}-{d}"), []).extend(json.loads(u.data))
     fx = _fx_series()
     now = [0.0]  # reloj simulado: la espera entre rondas de reintento lo adelanta (R14)
+    crm = MemoryCrmStore({})
     api = CardApi(MemoryStore(pages), MemoryFxStore({"USD": fx}), Settings("c", "s", "k"),
-                  Chaos("normal", seed=9, rng=random.Random(2), clock=lambda: now[0]), sleep=lambda s: None)
+                  Chaos("normal", seed=9, rng=random.Random(2), clock=lambda: now[0]), sleep=lambda s: None, crm_store=crm)
     client = ApiClient("http://fake/api", "c", "s", run_id="e2e", session=FakeSession(api), sleep=lambda s: None,
                        rng=random.Random(4))
     for resource in ("authorizations", "settlements"):
         assert bronze_api.ingest_cards_api(spark, cfg, client, resource, batch_days=200,
                                            sleep=lambda s: now.__setitem__(0, now[0] + s))["incomplete_days"] == []
     bronze_api.ingest_fx(spark, cfg, bronze_api.mirror_page_getter(client), ("USD",), "mirror", "e2e")
-    bronze_api.flush_calls(spark, cfg, client)
-    # Salesforce: el CRM generado se carga en un Salesforce falso y se ingesta incremental
+    # CRM: el generado se publica en la API (con el mismo caos) y se ingesta incremental
     generate_crm(spark, cfg)
-    sf = FakeSalesforce()
-    assert all(r["fallidos"] == 0 for r in seed_salesforce(spark, cfg, sf))
-    sf.delete("Lead", "LEA-00001")                           # un borrado: tiene que desaparecer de silver
-    bronze_salesforce.ingest_salesforce(spark, cfg, bronze_salesforce.simple_salesforce_query_all(sf), "e2e")
+    crm.data = crm_state(spark, cfg)
+    fetch = bronze_crm.crm_api_fetcher(client)
+    bronze_crm.ingest_crm(spark, cfg, fetch, "e2e")
+    lead = next(r for r in crm.data["Lead"] if r["Andes_Key__c"] == "LEA-00001")
+    lead.update(IsDeleted=True, SystemModstamp="2026-10-21T10:00:00.000+0000")   # un borrado posterior
+    second = {r["object"]: r for r in bronze_crm.ingest_crm(spark, cfg, fetch, "e2e-2")}
+    assert second["Lead"]["deleted"] == 1 and second["Account"]["rows"] < 10         # incremental: sólo lo nuevo
+    bronze_api.flush_calls(spark, cfg, client)
     silver = load_all(spark, cfg)
     build_gold(spark, cfg)
     build_marts(spark, cfg)
@@ -158,7 +160,7 @@ def test_gold_y_gate(spark, lake):
 
 
 def test_crm_match_con_el_core_contra_la_verdad(spark, lake):
-    """DAT-09/16/17: cada cuenta de Salesforce que es cliente se une a SU persona del core, aunque el ID esté mal."""
+    """DAT-09/16/17: cada cuenta del CRM que es cliente se une a SU persona del core, aunque el ID esté mal."""
     cfg, silver = lake
     assert silver["crm"]["crm_accounts"] > 0
     truth = spark.table(cfg.table("sim", "crm_accounts")).select(

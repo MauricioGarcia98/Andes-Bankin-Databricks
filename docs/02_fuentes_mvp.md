@@ -1,7 +1,7 @@
 # 02 · Fuentes del MVP
 
 Período simulado: **2023-01-01 → hoy**, con una corrida diaria que genera el día nuevo. Volúmenes a **SF 1**; a
-SF 0,1 todo es ~10 veces menor (salvo Salesforce y FX, que no escalan).
+SF 0,1 todo es ~10 veces menor (salvo el CRM y FX, que no escalan).
 
 ## Resumen
 
@@ -13,13 +13,12 @@ SF 0,1 todo es ~10 veces menor (salvo Salesforce y FX, que no escalan).
 | `core_balances` | core bancario | Azure Blob `landing/core/balances/` | CSV | diario (saldo de cierre) | ~800 mil por día (muestreado) |
 | `card_authorizations` | **API** del procesador (Azure Functions) | `GET /v1/authorizations`, `GET /v2/authorizations` | JSON paginado | casi tiempo real | **~60 M** |
 | `card_settlements` | **API** del procesador | `GET /v2/settlements` | JSON paginado | diario | ~55 M |
-| `sf_account`, `sf_contact` | **Salesforce** | objetos estándar | REST / Bulk API 2.0 | incremental por `SystemModstamp` | ~3-5 mil |
-| `sf_lead`, `sf_opportunity`, `sf_case` | **Salesforce** | objetos estándar | REST / Bulk API 2.0 | incremental | ~5-10 mil |
+| `crm_account`, `crm_contact` | **API** del CRM comercial (Azure Functions) | `GET /crm/v1/<Objeto>` | JSON paginado | incremental por `SystemModstamp` | ~1.100 |
+| `crm_lead`, `crm_opportunity`, `crm_case` | **API** del CRM comercial | `GET /crm/v1/<Objeto>` | JSON paginado | incremental | ~800 |
 | `fx_bcra` | **API pública real del BCRA** (estadísticas cambiarias) | internet | JSON | días hábiles | ~1.000 filas |
 | `fx_mirror` | espejo simulado de la API del BCRA, con caos | Azure Functions | JSON | días hábiles | ~1.000 filas |
 
-> **Salesforce no escala** porque una org gratuita tiene muy poco almacenamiento (una Developer Edition trae unos
-> pocos MB, que alcanzan para miles de registros, no millones). Es realista: el CRM de un banco tiene muchos menos
+> **El CRM no escala**: lo carga a mano el equipo comercial, así que tiene miles de registros, no millones. Es realista: el CRM de un banco tiene muchos menos
 > registros que el core. El volumen lo ponen el core y las tarjetas. El *match* CRM ↔ core se hace sobre una muestra
 > de clientes.
 
@@ -50,21 +49,23 @@ Authorization: Bearer <token OAuth client_credentials, vence en 15 min>
 - El caos se controla con una configuración (`CHAOS_PROFILE=off|normal|dificil`) y una semilla, para que cada falla
   sea **reproducible**.
 
-## Salesforce
+## CRM comercial
 
-Objetos estándar (Account, Contact, Lead, Opportunity, Case) con campos custom: `Core_Customer_Id__c`, `CUIT__c` y
-`Segmento__c` en la cuenta, `Producto__c` en la oportunidad y `Andes_Key__c` en todos. Esta última es una
-**clave externa de carga** que permite hacer upsert y relacionar hijos con padres sin conocer los Id de Salesforce.
+Un CRM simulado con el modelo de datos de Salesforce: objetos estándar (Account, Contact, Lead, Opportunity, Case)
+con campos custom: `Core_Customer_Id__c`, `CUIT__c` y `Segmento__c` en la cuenta, `Producto__c` en la oportunidad y
+`Andes_Key__c` en todos. Esta última es la **clave de carga**: el generador relaciona hijos con padres por ella, y
+el CRM le asigna a cada registro su `Id`.
 
-- **Volumen fijo de unos 1.900 registros**: 515 cuentas, unos 600 contactos, 250 leads, 350 oportunidades y 200 casos. Una org
-  gratuita tiene unos 5 MB de datos y cada registro ocupa unos 2 KB.
-- **Carga:** la hace el notebook `05_salesforce_seed`, dentro del job de fuentes:
+- **Volumen fijo de unos 1.900 registros**: 515 cuentas, unos 600 contactos, 250 leads, 350 oportunidades y 200 casos.
+- **Publicación:** la hace el notebook `05_crm_publish`, dentro del job de fuentes:
   1. Genera `sim.crm_*` a partir de una muestra fija de clientes PyME y Premium.
-  2. Crea los campos custom por Tooling API y un permission set que los hace visibles. Sin el permission set, los
-     campos creados por API no los ve nadie.
-  3. Hace upsert con Bulk API 2.0.
-- **Ingesta:** la hace `14_bronze_salesforce`. Es incremental por `SystemModstamp` con `queryAll`, que incluye la
-  papelera para que un borrado se propague, y hace MERGE por Id.
+  2. Arma lo que tiene adentro el CRM (`Id`, `CreatedDate`, `SystemModstamp`, `IsDeleted` y los campos calculados),
+     siempre igual para la misma semilla.
+  3. Lo sube a `crm-data/<Objeto>.json` en Blob.
+- **API:** `GET /crm/v1/<Objeto>?modified_since=...` en la misma Function que tarjetas, con el mismo OAuth y el mismo
+  caos. Pagina de a 500 por cursor e incluye los borrados.
+- **Ingesta:** la hace `14_bronze_crm`. Es incremental por `SystemModstamp`, concilia contra `total` y hace MERGE por
+  Id, así que un borrado se propaga.
 - **Suciedad:** DAT-09, DAT-16, DAT-17 y DAT-18 (ver el catálogo).
 
 ## FX: API real del BCRA + espejo con caos
@@ -79,4 +80,4 @@ Objetos estándar (Account, Contact, Lead, Opportunity, Case) con campos custom:
 
 Un paquete Python (`src/andes_bank/generator/`) genera **toda** la empresa con una semilla fija: los mismos
 clientes, cuentas y movimientos cada vez. De ahí salen los archivos del core, los archivos que sirve la API de
-tarjetas y los CSV para cargar Salesforce. Corre en Databricks (cómputo gratis de Free Edition) y escribe en Blob.
+tarjetas y el estado del CRM. Corre en Databricks (cómputo gratis de Free Edition) y escribe en Blob.

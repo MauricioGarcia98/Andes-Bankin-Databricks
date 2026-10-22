@@ -33,7 +33,7 @@ perfil `normal` del caos; el resto queda para el perfil `dificil`.
 | DAT-06 | **Husos horarios** | el procesador manda UTC; el core, hora local sin offset | todo a UTC en Silver; `fecha_local` derivada para el negocio | ✅ |
 | DAT-07 | **Identificadores inválidos** | CUIT con dígito verificador mal, CBU de 21 dígitos | validación con el algoritmo real; cuarentena | ✅ |
 | DAT-08 | **Cliente duplicado entre bancos fusionados** | misma persona como `CUY-` y `NOA-` | resolución de identidad por DNI/CUIT + nombre; tabla `customer_xref` | ✅ |
-| DAT-09 | **CRM que no matchea con el core** | `Core_Customer_Id__c` vacío o con el ID del banco viejo | match por CUIT/DNI; métrica "% de cuentas de Salesforce sin match" | ✅ |
+| DAT-09 | **CRM que no matchea con el core** | `Core_Customer_Id__c` vacío o con el ID del banco viejo | match por CUIT/DNI; métrica "% de cuentas del CRM sin match" | ✅ |
 | DAT-10 | **Saldos que no concilian** | suma de movimientos ≠ saldo de cierre | tabla de diferencias con causa (movimiento faltante, duplicado, ajuste) | ✅ |
 | DAT-11 | **PII en texto plano** | email y teléfono en una columna `observaciones` | detección por regex; máscara en Unity Catalog | ✅ |
 | DAT-12 | **CDC con borrados y reaperturas** | cliente dado de baja y vuelto a dar de alta | SCD2 en clientes y cuentas | ✅ |

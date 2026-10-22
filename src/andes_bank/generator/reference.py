@@ -11,7 +11,7 @@ from datetime import date
 
 # ------------------------------------------------------------------------------------------- hitos
 CORE_MIGRATION_DATE = date(2024, 3, 11)      # migración del core: antes latin1 + ';' + dd/MM/yyyy
-SALESFORCE_GO_LIVE = date(2024, 6, 3)        # pasan del CRM casero a Salesforce
+CRM_GO_LIVE = date(2024, 6, 3)               # pasan del CRM casero al CRM comercial nuevo
 API_V2_LAUNCH = date(2025, 4, 1)             # el procesador publica la API v2 (cursor, montos decimales)
 API_V1_LAST_EXPORT = date(2025, 6, 30)       # último exporte diario de la integración vieja (v1)
 CANAL_DIGITAL_SINCE = date(2025, 1, 2)       # schema drift: columna nueva en el CSV de movimientos

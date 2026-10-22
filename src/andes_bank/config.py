@@ -7,7 +7,7 @@ Un único objeto `ProjectConfig` resuelve:
   * el `scale_factor`, que escala la CANTIDAD DE CLIENTES (y con ellos cuentas, tarjetas y movimientos).
 
 ¿Por qué escalar clientes y no días? Porque la historia del banco (devaluación de dic-2023, migración del
-core en mar-2024, Salesforce en 2024, API v2 en 2025) tiene que estar completa a cualquier escala.
+core en mar-2024, CRM nuevo en 2024, API v2 en 2025) tiene que estar completa a cualquier escala.
 """
 
 from __future__ import annotations

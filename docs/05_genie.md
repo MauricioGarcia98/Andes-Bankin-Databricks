@@ -23,7 +23,7 @@ natural es **Genie Agents + Genie One**. Para que también le responda al equipo
 
 | agent | área | tablas principales | ejemplos de preguntas |
 |---|---|---|---|
-| **Andes · Comercial y clientes** | Comercial | `dim_cliente`, `dim_cuenta`, `fact_oportunidad`, `fact_lead` (Salesforce + core) | *¿Qué sucursal convierte más leads de tarjeta?* · *¿Cuántos clientes de Cuyo tienen sólo caja de ahorro?* |
+| **Andes · Comercial y clientes** | Comercial | `dim_cliente`, `dim_cuenta`, `fact_oportunidad`, `fact_lead` (CRM + core) | *¿Qué sucursal convierte más leads de tarjeta?* · *¿Cuántos clientes de Cuyo tienen sólo caja de ahorro?* |
 | **Andes · Tarjetas y fraude** | Prevención de fraude | `fact_autorizacion`, `dim_comercio`, `dim_tarjeta` | *¿Qué comercios tuvieron más rechazos por sospecha la semana pasada?* · *Compras de más de 5 veces el promedio del cliente* |
 | **Andes · Finanzas y tesorería** | Tesorería | `fact_saldo_diario`, `fact_movimiento`, `dim_date` (con FX) | *¿Cuántos depósitos en USD tenemos, valuados al oficial de hoy?* · *¿Cómo afectó la devaluación de dic-2023 a los saldos?* |
 | **Andes · Plataforma de datos** | Data Engineering / Analytics | `ops.ingestion_runs`, `ops.api_calls`, `ops.quality_results`, `ops.conciliaciones` | *¿Qué ingestas fallaron ayer y por qué?* · *¿Cuántos 429 dio la API de tarjetas?* · *¿Cuántas filas fueron a cuarentena por CUIT inválido?* |

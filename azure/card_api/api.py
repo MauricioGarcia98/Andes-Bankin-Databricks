@@ -1,4 +1,5 @@
-"""La API de "Andes Card Processing" (el procesador de tarjetas) y el espejo del BCRA, sin depender de Azure.
+"""La API de "Andes Card Processing" (el procesador de tarjetas), el espejo del BCRA y la API del CRM comercial,
+sin depender de Azure.
 
 `handle(request)` recibe un pedido HTTP ya parseado y devuelve (status, headers, body). `function_app.py` sólo
 traduce entre esto y Azure Functions; así toda la lógica (y el caos) se prueba con pytest, sin nube.
@@ -12,6 +13,7 @@ GET  /v2/authorizations/daily-totals?processing_date=...             para concil
 GET  /v2/settlements/daily-totals?settlement_date=...
 GET  /v1/authorizations?processing_date=...&offset=0&limit=200       legacy: offset/limit y montos en centavos
 GET  /fx/estadisticascambiarias/v1.0/Cotizaciones/USD?fechadesde=&fechahasta=&offset=&limit=   espejo del BCRA
+GET  /crm/v1/<Objeto>?modified_since=<ISO>[&cursor=...]    CRM: registros (borrados incluidos) modificados desde
 GET  /health
 """
 
@@ -30,6 +32,8 @@ from store import PAGE_SIZE
 V2_LAUNCH = "2025-04-01"
 DATE_PARAM = {"authorizations": "processing_date", "settlements": "settlement_date"}
 AMOUNT_FIELD = {"authorizations": "billing_amount_ars", "settlements": "settled_billing_ars"}
+CRM_OBJECTS = ("Account", "Contact", "Lead", "Opportunity", "Case")
+CRM_PAGE_SIZE = 500
 
 
 @dataclass
@@ -74,9 +78,10 @@ def _valid_day(day: str | None) -> bool:
 
 
 class CardApi:
-    def __init__(self, store, fx_store, settings: Settings, chaos: Chaos, sleep=time.sleep):
+    def __init__(self, store, fx_store, settings: Settings, chaos: Chaos, sleep=time.sleep, crm_store=None):
         self.store = store
         self.fx_store = fx_store
+        self.crm_store = crm_store
         self.settings = settings
         self.chaos = chaos
         self.sleep = sleep
@@ -91,6 +96,8 @@ class CardApi:
         if path.startswith("/fx/"):
             return self._guarded(req, lambda: self._fx(req, path))
         parts = path.strip("/").split("/")
+        if len(parts) == 3 and parts[:2] == ["crm", "v1"]:
+            return self._guarded(req, lambda: self._crm(req, parts[2]), pageable=True)
         if len(parts) >= 2 and parts[0] == "v2" and parts[1] in DATE_PARAM:
             if len(parts) == 3 and parts[2] == "daily-totals":
                 return self._guarded(req, lambda: self._totals(req, parts[1]))
@@ -218,6 +225,32 @@ class CardApi:
             pos += len(take)
         return _json(200, {"total": manifest["records"], "offset": offset, "limit": limit,
                            "items": [_to_v1(r) for r in rows]})
+
+    # ------------------------------------------------------------------------------------------- CRM
+    def _crm(self, req: Request, obj: str):
+        """Registros modificados desde `modified_since` (>=), ordenados por (SystemModstamp, Id), de a 500.
+
+        Trae también los borrados (`IsDeleted: true`): sin eso, un registro borrado en el CRM no desaparece nunca del
+        lakehouse. El cursor guarda el filtro, así que las páginas siguientes no lo repiten.
+        """
+        if obj not in CRM_OBJECTS:
+            return _json(404, {"error": "not_found", "message": f"Objeto desconocido: {obj}. Válidos: {CRM_OBJECTS}"})
+        cursor = req.params.get("cursor")
+        if cursor:
+            c = _decode_cursor(cursor)
+            if not c or c.get("o") != obj or "p" not in c:
+                return _json(400, {"error": "invalid_cursor"})
+        else:
+            c = {"o": obj, "s": req.params.get("modified_since") or "", "p": 1}
+        since = c["s"][:19]
+        rows = [r for r in (self.crm_store.records(obj) if self.crm_store else None) or []
+                if r["SystemModstamp"][:19] >= since]
+        rows.sort(key=lambda r: (r["SystemModstamp"], r["Id"]))
+        page = int(c["p"])
+        chunk = rows[(page - 1) * CRM_PAGE_SIZE: page * CRM_PAGE_SIZE]
+        more = page * CRM_PAGE_SIZE < len(rows)
+        return _json(200, {"data": chunk, "page": page, "page_size": CRM_PAGE_SIZE, "total": len(rows),
+                           "next_cursor": _encode_cursor(dict(c, p=page + 1)) if more else None, "has_more": more})
 
     # ---------------------------------------------------------------------------------- espejo BCRA
     def _fx(self, req: Request, path: str):

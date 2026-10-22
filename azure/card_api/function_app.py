@@ -1,7 +1,7 @@
-"""Azure Function (modelo Python v2): un solo HTTP trigger que le pasa todo a `api.CardApi`.
+"""Azure Function (modelo Python v2): un solo HTTP trigger que le pasa todo a `api.CardApi` (tarjetas, espejo FX y CRM).
 
 Configuración (app settings de la Function App, nunca en el código):
-  DATA_STORAGE_CONNECTION   conexión al Storage con las páginas (api-data) y el espejo FX (fx-mirror)
+  DATA_STORAGE_CONNECTION   conexión al Storage con las páginas (api-data), el espejo FX (fx-mirror) y el CRM (crm-data)
   API_CLIENT_ID / API_CLIENT_SECRET   credenciales que le damos al "cliente" (el lakehouse)
   TOKEN_SIGNING_KEY         clave para firmar los tokens
   CHAOS_PROFILE             off | normal | dificil        CHAOS_SEED   semilla de las fallas estructurales
@@ -15,7 +15,7 @@ import azure.functions as func
 
 from api import CardApi, Request, Settings
 from chaos import Chaos
-from store import BlobFxStore, BlobStore
+from store import BlobCrmStore, BlobFxStore, BlobStore
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 
@@ -25,6 +25,7 @@ _api = CardApi(
     fx_store=BlobFxStore(_conn),
     settings=Settings(os.environ["API_CLIENT_ID"], os.environ["API_CLIENT_SECRET"], os.environ["TOKEN_SIGNING_KEY"]),
     chaos=Chaos(os.environ.get("CHAOS_PROFILE", "normal"), int(os.environ.get("CHAOS_SEED", "1998"))),
+    crm_store=BlobCrmStore(_conn),
 )
 
 

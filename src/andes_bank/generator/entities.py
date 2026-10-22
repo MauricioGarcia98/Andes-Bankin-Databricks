@@ -2,7 +2,7 @@
 
 Todo sale de `spark.range` + hashes determinísticos (`rand.uniform`): la misma semilla da siempre el mismo banco, sin
 importar cuántos executors haya. Estas tablas viven en el esquema `sim`; el lakehouse NO las lee (llega a ellas
-sólo a través de los exportes sucios del core, la API del procesador y Salesforce).
+sólo a través de los exportes sucios del core, la API del procesador y el CRM).
 """
 
 from __future__ import annotations

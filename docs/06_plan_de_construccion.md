@@ -15,11 +15,11 @@ Si falla, Punto de control (tag `etapa-NN`) y Ejercicio. Los tiempos son estimad
 | 05 | Infraestructura Azure con `az` | resource group, Storage, Function App, Application Insights, presupuesto, teardown | 2 h |
 | 06 | La API de tarjetas | Functions v1 y v2, OAuth simulado, paginación, perfiles de caos | 4 h |
 | 07 | El espejo de FX y la API real del BCRA | Function espejo + prueba contra la API real | 1 h 30 |
-| 08 | Salesforce | crear la org, el campo custom y la carga con `sf` | 2 h |
+| 08 | CRM comercial | generar el CRM y servirlo en la API (`/crm/v1`) | 2 h |
 | **Parte 2 · Ingesta** | | | |
 | 09 | Bronze de archivos | Auto Loader sobre el core, con los dos formatos | 2 h |
 | 10 | El cliente de API robusto | reintentos, backoff, token, cursor, checkpoint, `ops.api_calls` | 4 h |
-| 11 | Bronze de tarjetas, FX y Salesforce | las tres ingestas por API, idempotentes | 3 h |
+| 11 | Bronze de tarjetas, FX y CRM | las tres ingestas por API, idempotentes | 3 h |
 | **Parte 3 · Transformación** | | | |
 | 12 | Silver I: limpiar | parseos argentinos, monedas, husos, identificadores, cuarentena | 3 h |
 | 13 | Silver II: identidad, SCD2 y conciliación | `customer_xref`, SCD2, saldos vs. movimientos | 3 h |
@@ -45,4 +45,3 @@ Total aproximado: **55-60 horas**.
 1. Aprobás esta definición (docs 00 a 07).
 2. Se construye **etapa por etapa**. Al final de cada una: tests verdes, commit con tag y el capítulo de `construir/`
    escrito con los errores **reales** que aparecieron.
-3. Salesforce se crea recién en la etapa 08.

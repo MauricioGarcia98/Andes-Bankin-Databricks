@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Etapa 05 · Infraestructura de Azure del proyecto (idempotente: se puede correr varias veces).
 #
-#   Storage (datos)      andesbank<sufijo>  contenedores: core, cards-legacy, api-data, fx-mirror
+#   Storage (datos)      andesbank<sufijo>  contenedores: core, cards-legacy, api-data, fx-mirror, crm-data
 #   Storage (funciones)  andesfn<sufijo>
 #   Function App         andes-card-api-<sufijo>  (Flex Consumption, Python 3.12, 512 MB, máx. 4 instancias)
 #

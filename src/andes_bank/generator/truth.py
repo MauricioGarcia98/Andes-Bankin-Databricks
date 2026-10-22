@@ -4,7 +4,7 @@
     sim.authorizations · sim.settlements · sim.transactions · sim.balances
 
 El lakehouse nunca lee `sim`: llega a los datos sólo por los exportes sucios (core), la API (procesador) y
-Salesforce. `sim` sirve para los tests y para medir si el pipeline recuperó la verdad.
+el CRM. `sim` sirve para los tests y para medir si el pipeline recuperó la verdad.
 """
 
 from __future__ import annotations

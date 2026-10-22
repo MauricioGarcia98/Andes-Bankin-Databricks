@@ -10,10 +10,10 @@ export RG="${ANDES_RG:-rg-andes-bank}"
 export LOCATION="${ANDES_LOCATION:-eastus2}"
 SUFFIX="$(echo -n "$AZURE_SUBSCRIPTION_ID" | sha256sum | cut -c1-6)"
 export SUFFIX
-export STORAGE="andesbank${SUFFIX}"            # datos de los sistemas origen (core, procesador, espejo FX)
+export STORAGE="andesbank${SUFFIX}"            # datos de los sistemas origen (core, procesador, espejo FX, CRM)
 export FUNC_STORAGE="andesfn${SUFFIX}"         # almacenamiento interno de la Function App (código desplegado)
-export FUNC_APP="andes-card-api-${SUFFIX}"     # la "API del procesador de tarjetas" + espejo del BCRA
-export CONTAINERS="core cards-legacy api-data fx-mirror"
+export FUNC_APP="andes-card-api-${SUFFIX}"     # la "API del procesador de tarjetas" + espejo del BCRA + CRM
+export CONTAINERS="core cards-legacy api-data fx-mirror crm-data"
 export TAGS="proyecto=andes-bank entorno=dev dueno=datos"
 
 az_login() {
