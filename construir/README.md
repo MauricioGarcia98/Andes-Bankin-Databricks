@@ -75,6 +75,17 @@ Antes de empezar, mirá los [diagramas](../docs/diagramas/README.md): uno por fa
 
 Total: unas **55-60 horas**.
 
+## Los tags `etapa-NN`
+
+Cada capítulo termina comparando tu código con un tag (`git diff etapa-NN -- <archivos>`). Los tags apuntan al
+**último** commit de `main` que tocó los archivos de esa etapa, y los crea un script:
+
+```bash
+git fetch origin main --tags
+bash scripts/etapas.sh             # muestra qué commit le toca a cada etapa
+bash scripts/etapas.sh --push      # los crea y los sube (hace falta permiso de push a tags en el repo)
+```
+
 ## Cómo es cada capítulo
 
 1. **🎯 Objetivo**: qué vas a tener al final y por qué esta etapa va en este lugar.
