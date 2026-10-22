@@ -11,19 +11,23 @@ from datetime import date
 
 import pytest
 from fake_http import FakeSession
+from fake_salesforce import FakeSalesforce
 from pyspark.sql import functions as F
 
 from andes_bank.config import local_config
 from andes_bank.generator import reference as ref
+from andes_bank.generator.crm import generate_crm
 from andes_bank.generator.exports import export_all
 from andes_bank.generator.truth import generate_truth
 from andes_bank.generator.upload import api_uploads, cards_legacy_uploads, core_uploads
+from andes_bank.gold.crm import build_crm_gold
 from andes_bank.gold.marts import build_marts
 from andes_bank.gold.model import build_gold
-from andes_bank.ingestion import bronze_api, bronze_files
+from andes_bank.ingestion import bronze_api, bronze_files, bronze_salesforce
 from andes_bank.ingestion.api_client import ApiClient
 from andes_bank.ingestion.landing_sync import RemoteFile, run_sync
 from andes_bank.quality.gate import gate
+from andes_bank.salesforce.seed import seed_salesforce
 from andes_bank.setup import create_namespace
 from andes_bank.silver.load import load_all
 from api import CardApi, Settings  # noqa: E402
@@ -74,9 +78,16 @@ def lake(spark, tmp_path_factory):
                                            sleep=lambda s: now.__setitem__(0, now[0] + s))["incomplete_days"] == []
     bronze_api.ingest_fx(spark, cfg, bronze_api.mirror_page_getter(client), ("USD",), "mirror", "e2e")
     bronze_api.flush_calls(spark, cfg, client)
+    # Salesforce: el CRM generado se carga en un Salesforce falso y se ingesta incremental
+    generate_crm(spark, cfg)
+    sf = FakeSalesforce()
+    assert all(r["fallidos"] == 0 for r in seed_salesforce(spark, cfg, sf))
+    sf.delete("Lead", "LEA-00001")                           # un borrado: tiene que desaparecer de silver
+    bronze_salesforce.ingest_salesforce(spark, cfg, bronze_salesforce.simple_salesforce_query_all(sf), "e2e")
     silver = load_all(spark, cfg)
     build_gold(spark, cfg)
     build_marts(spark, cfg)
+    build_crm_gold(spark, cfg)
     return cfg, silver
 
 
@@ -144,3 +155,36 @@ def test_gold_y_gate(spark, lake):
     assert all(r["passed"] for r in results)
     warn = {r["rule"]: r["failed_rows"] for r in results if r["severity"] == "warn"}
     assert warn["archivos_corruptos"] == 1 and warn["cuit_valido"] > 0 and warn["personas_duplicadas"] > 0
+
+
+def test_crm_match_con_el_core_contra_la_verdad(spark, lake):
+    """DAT-09/16/17: cada cuenta de Salesforce que es cliente se une a SU persona del core, aunque el ID esté mal."""
+    cfg, silver = lake
+    assert silver["crm"]["crm_accounts"] > 0
+    truth = spark.table(cfg.table("sim", "crm_accounts")).select(
+        F.col("Andes_Key__c").alias("clave_carga"), "_true_customer_id", "_dirt")
+    xref = spark.table(cfg.table("silver", "customer_xref")).select(
+        F.col("cliente_id").alias("_true_customer_id"), F.col("persona_id").alias("_true_persona"))
+    acc = spark.table(cfg.table("silver", "crm_accounts")).join(truth, "clave_carga").join(xref, "_true_customer_id", "left") \
+        .withColumn("_true_persona", F.coalesce("_true_persona", "_true_customer_id"))
+    customers = acc.where("_true_customer_id IS NOT NULL")
+    # los que tienen CUIT o un ID bueno se unen bien; ninguno se une a OTRA persona
+    assert customers.where("persona_id IS NOT NULL AND persona_id != _true_persona").count() == 0
+    matched = customers.where("persona_id IS NOT NULL").count()
+    assert matched / customers.count() > 0.95
+    assert acc.where("_dirt = 'PROSPECTO'").where("persona_id IS NOT NULL").count() == 0
+    # cada duplicada quedó marcada (y apunta a una principal que no es ella misma)
+    dups = acc.where("_dirt = 'DUPLICADA'")
+    assert dups.count() > 0 and dups.where("es_duplicada AND cuenta_principal_id != cuenta_crm_id").count() == dups.count()
+
+
+def test_crm_gold_y_borrados(spark, lake):
+    cfg, _ = lake
+    leads = spark.table(cfg.table("silver", "crm_leads"))
+    assert leads.count() == spark.table(cfg.table("sim", "crm_leads")).count() - 1      # el borrado no está
+    assert leads.where("ya_es_cliente").count() > 0                                      # DAT-18 detectado
+    casos = spark.table(cfg.table("gold", "fact_caso"))
+    assert casos.where(F.col("descripcion").rlike("@|\\+54")).count() == 0                # DAT-11: sin PII
+    opp = spark.table(cfg.table("gold", "fact_oportunidad"))
+    assert opp.count() == spark.table(cfg.table("sim", "crm_opportunities")).count()
+    assert spark.table(cfg.table("gold", "mart_pipeline_comercial")).count() > 0

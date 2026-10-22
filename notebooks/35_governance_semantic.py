@@ -15,3 +15,5 @@ from andes_bank.sql_runner import run_folder
 
 print(run_folder(spark, cfg, "governance"))
 print(run_folder(spark, cfg, "semantic"))
+if spark.catalog.tableExists(cfg.table("gold", "dim_cuenta_crm")):  # el CRM llega en la etapa 08
+    print(run_folder(spark, cfg, "crm"))

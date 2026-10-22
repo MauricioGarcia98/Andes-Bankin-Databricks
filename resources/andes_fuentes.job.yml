@@ -1,5 +1,5 @@
 # Job "fuentes": simula los sistemas origen del banco. No es parte del lakehouse: es el "mundo exterior".
-# genera la verdad → la exporta sucia → la sube a Azure (y en paralelo copia el BCRA real al espejo).
+# genera la verdad → la exporta sucia → la sube a Azure (en paralelo: copia el BCRA real al espejo y carga Salesforce).
 resources:
   jobs:
     andes_fuentes:
@@ -44,3 +44,8 @@ resources:
           min_retry_interval_millis: 60000
           notebook_task:
             notebook_path: ../notebooks/04_fx_mirror.py
+        - task_key: salesforce_seed
+          depends_on: [{ task_key: generate_truth }]
+          max_retries: 1
+          notebook_task:
+            notebook_path: ../notebooks/05_salesforce_seed.py

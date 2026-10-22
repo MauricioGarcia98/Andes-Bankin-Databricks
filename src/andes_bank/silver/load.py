@@ -15,6 +15,7 @@ from pyspark.sql import functions as F
 
 from andes_bank.config import ProjectConfig
 from andes_bank.silver import cards, core
+from andes_bank.silver.crm import load_crm
 from andes_bank.utils.delta import get_watermark, merge_insert_only, merge_upsert_when, set_watermark
 
 
@@ -155,5 +156,6 @@ def load_all(spark: SparkSession, cfg: ProjectConfig) -> dict:
     out["balances"] = load_balances(spark, cfg)
     out["cards"] = load_card_events(spark, cfg)
     out["balance_breaks"] = load_balance_breaks(spark, cfg)
+    out["crm"] = load_crm(spark, cfg)
     out["seconds"] = int((datetime.now(timezone.utc) - started).total_seconds())
     return out

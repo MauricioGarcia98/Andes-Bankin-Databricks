@@ -40,6 +40,9 @@ perfil `normal` del caos; el resto queda para el perfil `dificil`.
 | DAT-13 | **Feriados sin cotización** | el BCRA no publica fines de semana ni feriados | `dim_date.fx_oficial` repite el último publicado | ✅ |
 | DAT-14 | **Montos imposibles** | compra de ARS 999.999.999 con débito | regla de calidad + cuarentena | dificil |
 | DAT-15 | **Autorización sin liquidación (y viceversa)** | la liquidación llega días después o nunca | conciliación tarjetas, con antigüedad | dificil |
+| DAT-16 | **Cuentas duplicadas en el CRM** | la misma empresa cargada dos veces por dos ejecutivos | mismo CUIT → una cuenta principal; oportunidades y casos se atribuyen a la principal | ✅ |
+| DAT-17 | **CUIT con formatos distintos** | `30-12345678-9`, `30123456789` o vacío | se normaliza a 11 dígitos antes de cruzar | ✅ |
+| DAT-18 | **Leads que ya son clientes** | un cliente cargado como prospecto nuevo | cruce por CUIT: `ya_es_cliente` | ✅ |
 
 ## C · Problemas en la ingesta
 

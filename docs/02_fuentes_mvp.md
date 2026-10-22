@@ -52,9 +52,20 @@ Authorization: Bearer <token OAuth client_credentials, vence en 15 min>
 
 ## Salesforce
 
-Objetos estándar (Account, Contact, Lead, Opportunity, Case) más un campo custom `Core_Customer_Id__c` que a veces
-está vacío o mal cargado (ver catálogo). La carga inicial se hace con la **Salesforce CLI** (`sf data import bulk`) a
-partir de archivos que genera el mismo generador del proyecto.
+Objetos estándar (Account, Contact, Lead, Opportunity, Case) con campos custom: `Core_Customer_Id__c`, `CUIT__c` y
+`Segmento__c` en la cuenta, `Producto__c` en la oportunidad y `Andes_Key__c` en todos. Esta última es una
+**clave externa de carga** que permite hacer upsert y relacionar hijos con padres sin conocer los Id de Salesforce.
+
+- **Volumen fijo de unos 1.900 registros**: 515 cuentas, unos 600 contactos, 250 leads, 350 oportunidades y 200 casos. Una org
+  gratuita tiene unos 5 MB de datos y cada registro ocupa unos 2 KB.
+- **Carga:** la hace el notebook `05_salesforce_seed`, dentro del job de fuentes:
+  1. Genera `sim.crm_*` a partir de una muestra fija de clientes PyME y Premium.
+  2. Crea los campos custom por Tooling API y un permission set que los hace visibles. Sin el permission set, los
+     campos creados por API no los ve nadie.
+  3. Hace upsert con Bulk API 2.0.
+- **Ingesta:** la hace `14_bronze_salesforce`. Es incremental por `SystemModstamp` con `queryAll`, que incluye la
+  papelera para que un borrado se propague, y hace MERGE por Id.
+- **Suciedad:** DAT-09, DAT-16, DAT-17 y DAT-18 (ver el catálogo).
 
 ## FX: API real del BCRA + espejo con caos
 
