@@ -4,7 +4,7 @@
 #   0) UNA SOLA VEZ, en el SQL Editor (Free Edition no deja crear catálogos por API):
 #        CREATE CATALOG IF NOT EXISTS andes_bank COMMENT 'Andes Bank: lakehouse bancario E2E';
 #   1) databricks bundle validate
-#   2) databricks bundle deploy -t dev
+#   2) databricks bundle deploy -t dev                # el lakehouse queda programado todos los días a las 7
 #   3) databricks bundle run andes_fuentes -t dev     # simula los sistemas origen y los sube a Azure
 #
 # El host del workspace se toma de DATABRICKS_HOST o de ~/.databrickscfg.
@@ -33,5 +33,5 @@ variables:
 
 targets:
   dev:
-    mode: development       # prefija los recursos con [dev <usuario>] y pausa los schedules
-    default: true
+    mode: development       # prefija los recursos con [dev <usuario>]. Pausa los schedules que no dicen nada; el del
+    default: true           # lakehouse dice pause_status: UNPAUSED a propósito (Free Edition tiene un solo workspace)

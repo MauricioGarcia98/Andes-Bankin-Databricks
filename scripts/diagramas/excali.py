@@ -163,8 +163,9 @@ class Diagram:
             if icon:
                 self.icon(icon, x + 16, y + (h - ih) / 2, k)
                 pad = 16 + iw
-        label = self._label(el, text, size, INK, family, pad_left=pad)
-        label["y"] += top
+        if text:
+            label = self._label(el, text, size, INK, family, pad_left=pad)
+            label["y"] += top
         self.boxes[bid] = Box(bid, x, y, w, h)
         return self.boxes[bid]
 
@@ -196,6 +197,8 @@ class Diagram:
         return w * k, h * k
 
     def note(self, x, y, w, h, text: str, color: str = "amarillo", size: float = 16) -> None:
+        """Nota con texto arriba a la izquierda. El alto lo pone el texto (`h` queda como mínimo)."""
+        h = max(_text_size(text, size)[1] + 24, min(h, 60))
         el = self._base("rectangle", self._id("n"), x, y, w, h, backgroundColor=FILL[color],
                         strokeColor=STROKE[color], strokeWidth=1, roundness={"type": 3})
         self._label(el, text, size, MUTED, align="left", valign="top")

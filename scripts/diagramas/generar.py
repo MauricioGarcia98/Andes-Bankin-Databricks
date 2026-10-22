@@ -200,7 +200,7 @@ def gold() -> Diagram:
     d.note(980, 560, 520, 120, "Las oportunidades y casos de una cuenta\nduplicada se atribuyen a su cuenta\nprincipal: para Comercial, una empresa\nes una sola.")
 
     d.zone(1600, 130, 560, 870, "quality_gate", "rojo", icon="settings")
-    d.box("rules", 1640, 190, 480, 170, "24 reglas sobre silver y gold\n11 bloqueantes · 13 avisos\ncada una con su ID del catálogo", "gris", icon="settings")
+    d.box("rules", 1640, 190, 480, 170, "22 reglas sobre silver, gold y ops\n9 bloqueantes · 13 avisos\ncada una con su ID del catálogo", "gris", icon="settings")
     d.box("dq", 1640, 820, 480, 90, "ops.dq_results\n(historia de cada corrida)", "gris", icon="bar_chart")
     d.box("ok", 1640, 420, 480, 140, "¿falló alguna\nbloqueante?", "amarillo", 20, shape="diamond")
     d.box("fail", 1640, 620, 220, 120, "la corrida falla:\nnadie ve datos\nrotos", "rojo", 17, icon="error")
@@ -322,6 +322,272 @@ def api() -> Diagram:
 
 
 
+# ------------------------------------------------------------------------------------ 08 línea de tiempo
+def linea_de_tiempo() -> Diagram:
+    d = Diagram("08_linea_de_tiempo", "La historia del banco (y por qué los datos vienen así)")
+    d.heading(40, 20, "Cada hito deja una marca en los datos: el lakehouse tiene que entenderla, no esconderla")
+    hitos = [  # (x, arriba?, fecha, qué pasó, qué deja en los datos, color, ícono)
+        (80, True, "1998 · 2008", "nace en Cuyo; compra\nel banco del NOA", "la misma persona con\ndos números (DAT-08)", "naranja", "user"),
+        (330, False, "ene 2023", "empieza la historia\nque genera el proyecto", "start_date del\nscale_factor", "gris", "settings"),
+        (560, True, "13 dic 2023", "devaluación", "saltan los montos en\npesos y el dólar oficial", "rojo", "bar_chart"),
+        (790, False, "11 mar 2024", "migración del core", "dos contratos: latin1 ';'\nvs. UTF-8 gzip (DAT-03)", "azul", "database"),
+        (1020, True, "3 jun 2024", "CRM comercial nuevo", "cuentas sin ID del core\n(DAT-09, DAT-16)", "rosa", "user"),
+        (1250, False, "2 ene 2025", "columna canal_digital", "schema drift en\nmovimientos", "amarillo", "document"),
+        (1480, True, "1 abr 2025", "API v2 del procesador", "v1 y v2 a la vez hasta\njun-2025 (API-09)", "violeta", "function"),
+        (1710, False, "may-nov 2025", "incidentes de entrega", "vacío, tarde, truncado,\nduplicado (ING-01..04)", "rojo", "error"),
+        (1940, True, "1 mar 2026", "wallet_type en la API", "campo nuevo sin\naviso (API-11)", "violeta", "function"),
+        (2170, False, "20 oct 2026", "fin del período", "end_date: hasta acá\nhay datos", "verde", "genie"),
+    ]
+    y_line = 520
+    d.box("eje_i", 40, y_line - 4, 8, 8, "", "gris")
+    d.box("eje_f", 2400, y_line - 4, 8, 8, "", "gris")
+    d.arrow("eje_i", "eje_f", sides="rl", color="#495057")
+    for i, (x, up, fecha, que, marca, color, icon) in enumerate(hitos):
+        y = 160 if up else 600
+        d.box(f"h{i}", x, y, 210, 150, f"{fecha}\n{que}", color, 17, icon=icon)
+        d.text(x + 10, y + 160, marca, 15, "#495057")
+        d.box(f"p{i}", x + 100, y_line - 8, 16, 16, "", color, shape="ellipse")
+        d.arrow(f"h{i}", f"p{i}", sides="bt" if up else "tb", dashed=True, color="#868e96")
+    return d
+
+
+# ------------------------------------------------------------------------------------- 09 el generador
+def generador() -> Diagram:
+    d = Diagram("09_generador", "Cómo se genera el banco (la verdad: sim.*)")
+    d.heading(40, 20, "Spark + una semilla: xxhash64(clave, sal) en vez de rand(), así el banco es el mismo en cualquier cluster")
+
+    d.zone(40, 130, 520, 860, "entidades (entities.py)", "naranja", icon="python")
+    ents = [("br", "sucursales (62)\n+ índice mensual", "gris", "settings"), ("cu", "clientes\n(SF 0,1 = 50 mil)", "naranja", "user"),
+            ("ac", "cuentas\n(ARS, USD, corriente)", "naranja", "database"), ("ca", "tarjetas\n(débito y crédito)", "naranja", "key"),
+            ("me", "comercios\n(rubro, país)", "naranja", "internet")]
+    for i, (k, t, c, ic) in enumerate(ents):
+        d.box(k, 80, 190 + i * 155, 440, 120, t, c, icon=ic)
+    for a, b in (("cu", "ac"), ("ac", "ca")):
+        d.arrow(a, b, sides="bt")
+
+    d.zone(620, 130, 900, 860, "eventos (events.py): los sistemas están conectados", "violeta", icon="streaming")
+    d.box("auth", 660, 190, 380, 130, "autorizaciones\n(procesador)", "violeta", icon="function")
+    d.box("sett", 1100, 190, 380, 130, "liquidaciones\n1-3 días después", "violeta", icon="function")
+    d.box("txn", 660, 470, 380, 150, "movimientos del core\ncon saldo posterior", "azul", icon="database")
+    d.box("bal", 660, 780, 380, 130, "saldos de cierre", "azul", icon="bar_chart")
+    d.box("pay", 1100, 470, 380, 150, "pago del resumen\nde crédito (día 10)", "gris", icon="settings")
+    d.arrow("auth", "sett", "aprobadas", sides="rl")
+    d.arrow("auth", "txn", "compras con\ndébito", sides="bt")
+    d.arrow("sett", "pay", sides="bt")
+    d.arrow("pay", "txn", sides="lr")
+    d.arrow("txn", "bal", sides="bt")
+    d.arrow("ca", "auth", sides="rl", via=[(590, 655), (590, 255)])
+    d.arrow("me", "auth", sides="rl", via=[(600, 810), (600, 290)])
+    d.note(1100, 700, 380, 130, "Así el lakehouse PUEDE (y tiene\nque) conciliar un sistema contra\notro: procesador vs. core,\nmovimientos vs. saldos.")
+
+    d.zone(1580, 130, 620, 860, "exportes sucios (exports.py)", "azul", icon="document")
+    d.box("x_core", 1620, 190, 540, 190, "core: CSV por día\nantes de mar-2024: latin1, ';', 1.234,56\ndespués: UTF-8, ',', gzip\n+ duplicados, faltantes, moneda mal", "azul", 17, icon="database")
+    d.box("x_v1", 1620, 420, 540, 120, "procesador v1: JSON por día\ncentavos y epoch ms", "violeta", 17, icon="document")
+    d.box("x_v2", 1620, 580, 540, 120, "API v2: JSONL por día\n(lo que sirve la Function)", "violeta", 17, icon="function")
+    d.box("x_up", 1620, 760, 540, 150, "upload.py → Azure Blob\n+ incidentes: vacío, truncado,\nduplicado, el que llega tarde", "turquesa", 17, icon="blob")
+    d.arrow("bal", "x_core", sides="bl", via=[(850, 960), (1550, 960), (1550, 285)])
+    d.arrow("auth", "x_v1", sides="tl", via=[(850, 112), (1560, 112), (1560, 480)])
+    d.arrow("x_v2", "x_up", sides="bt")
+    return d
+
+
+# ------------------------------------------------------------------------------------- 10 el borde (landing)
+def landing() -> Diagram:
+    d = Diagram("10_landing_borde", "El borde del lakehouse: qué pasa con cada archivo")
+    d.heading(40, 20, "landing_sync lista Blob con una SAS de sólo lectura, valida cada archivo y deja todo en ops.landing_files")
+    d.box("blob", 40, 380, 260, 140, "blob nuevo o\ncon otro etag", "azul", icon="blob")
+    d.box("q1", 380, 370, 260, 160, "¿ya lo\nhabíamos copiado?", "amarillo", 18, shape="diamond")
+    d.box("changed", 380, 640, 260, 130, "CHANGED\nalerta, no se copia", "rojo", 17, icon="error")
+    d.box("q2", 720, 370, 260, 160, "¿descomprime?", "amarillo", 18, shape="diamond")
+    d.box("corrupt", 720, 640, 260, 130, "CORRUPT\na _errors/ (ING-03)", "rojo", 17, icon="error")
+    d.box("q3", 1060, 370, 260, 160, "¿mismo md5 que\notro aterrizado?", "amarillo", 18, shape="diamond")
+    d.box("dup", 1060, 640, 260, 130, "DUPLICATE_CONTENT\nno se copia (ING-01)", "rojo", 17, icon="error")
+    d.box("q4", 1400, 370, 260, 160, "¿tiene filas?", "amarillo", 18, shape="diamond")
+    d.box("empty", 1400, 640, 260, 130, "EMPTY: se copia\ny alerta (ING-02)", "naranja", 17, icon="document")
+    d.box("landed", 1740, 380, 300, 140, "LANDED\nal Volume", "verde", icon="storage")
+    d.box("al", 1740, 640, 300, 130, "Auto Loader\nlo levanta", "naranja", icon="streaming")
+    d.box("ops", 700, 860, 660, 100, "ops.landing_files: un registro por archivo, con su estado y su detalle", "gris", 17, icon="bar_chart")
+    d.arrow("blob", "q1", sides="rl")
+    d.arrow("q1", "changed", "sí", sides="bt")
+    d.arrow("q1", "q2", "no", sides="rl")
+    d.arrow("q2", "corrupt", "no", sides="bt")
+    d.arrow("q2", "q3", "sí", sides="rl")
+    d.arrow("q3", "dup", "sí", sides="bt")
+    d.arrow("q3", "q4", "no", sides="rl")
+    d.arrow("q4", "empty", "no", sides="bt")
+    d.arrow("q4", "landed", "sí", sides="rl")
+    d.arrow("landed", "al", sides="bt")
+    d.arrow("empty", "al", sides="rl")
+    d.note(40, 140, 600, 110, "¿Por qué copiar y no leer Blob directo?\nFree Edition no permite external locations\nhacia tu storage (ADR 0002). Copiar a un\nVolume con SAS de lectura es un patrón real.")
+    return d
+
+
+# --------------------------------------------------------------------------------- 11 cargar sólo lo nuevo
+def incremental() -> Diagram:
+    d = Diagram("11_incremental", "Cargar sólo lo nuevo: cada fuente recuerda hasta dónde llegó")
+    d.heading(40, 20, "Re-correr cualquier tarea no duplica nada: cada escritura es idempotente")
+    rows = [
+        ("files", "archivos del core\ny procesador v1", "blob", "Auto Loader + checkpoint\n(qué archivos ya leyó)",
+         "streaming", "trigger availableNow:\nlee lo nuevo y termina", "_checkpoints/bronze_*"),
+        ("api", "API de tarjetas v2\n(por día)", "function", "ops.api_watermarks\nel último día COMPLETO",
+         "server", "un día que no cierra contra\nlos totales no avanza (R14)", "replace_where por día"),
+        ("crm", "API del CRM\n(por SystemModstamp)", "user", "ops.crm_watermarks\nel mayor SystemModstamp",
+         "server", "pide >= watermark (con\nsolapamiento) e incluye borrados", "MERGE por Id: gana el más nuevo"),
+        ("silver", "silver de hechos\n(movimientos, saldos)", "delta", "ops.silver_watermarks\nmayor _ingested_at",
+         "delta", "procesa sólo filas nuevas\nde bronze", "MERGE insert-only: gana\nla primera copia"),
+    ]
+    d.text(60, 130, "fuente", 22, "#1971c2")
+    d.text(500, 130, "cómo sabe hasta dónde llegó", 22, "#6741d9")
+    d.text(1000, 130, "la regla", 22, "#e8590c")
+    d.text(1500, 130, "escritura idempotente", 22, "#2f9e44")
+    for i, (k, src, ic1, mark, ic2, rule, write) in enumerate(rows):
+        y = 180 + i * 190
+        d.box(f"s{k}", 40, y, 400, 150, src, "azul", icon=ic1)
+        d.box(f"m{k}", 480, y, 440, 150, mark, "violeta", 17, icon=ic2)
+        d.box(f"r{k}", 960, y, 460, 150, rule, "amarillo", 17)
+        d.box(f"w{k}", 1460, y, 440, 150, write, "verde", 17, icon="delta")
+        d.arrow(f"s{k}", f"m{k}", sides="rl")
+        d.arrow(f"m{k}", f"r{k}", sides="rl")
+        d.arrow(f"r{k}", f"w{k}", sides="rl")
+    return d
+
+
+# ------------------------------------------------------------------------------- 12 el día incompleto (R14)
+def dia_incompleto() -> Diagram:
+    d = Diagram("12_dia_incompleto_r14", "R14 · El bug que encontró el quality gate (y no los tests)")
+    d.heading(40, 20, "Una página salteada es estable 10 minutos: reintentar enseguida da lo mismo. Hay que seguir y volver después")
+    d.zone(40, 130, 1000, 520, "antes: reintentos inmediatos", "rojo", icon="error")
+    d.box("a1", 80, 200, 280, 120, "día 15-jul\npasada 1: 6.000/7.000", "rojo", 17)
+    d.box("a2", 400, 200, 280, 120, "pasada 2, 3, 4\nla misma página falta", "rojo", 17)
+    d.box("a3", 720, 200, 280, 120, "la ingesta se corta\nen el primer día malo", "rojo", 17, icon="error")
+    d.arrow("a1", "a2", "enseguida", sides="rl")
+    d.arrow("a2", "a3", sides="rl")
+    d.note(80, 380, 920, 230, "Síntoma en producción: el quality gate frena con dias_api_completos (2 filas).\nA 2 días les faltan EXACTAMENTE 1.000 registros: una página.\n\nEn los tests pasaba de casualidad: el caos dependía del reloj real.")
+    d.zone(1100, 130, 1060, 520, "después: seguir, y volver en rondas", "verde", icon="settings")
+    d.box("b1", 1140, 200, 300, 120, "lote de 30 días\n(4 en paralelo)", "verde", 17, icon="server")
+    d.box("b2", 1480, 200, 300, 120, "los incompletos\nse anotan y se sigue", "amarillo", 17)
+    d.box("b3", 1820, 200, 300, 120, "al final: hasta 3 rondas\ncon 4 min de espera", "verde", 17)
+    d.arrow("b1", "b2", sides="rl")
+    d.arrow("b2", "b3", sides="rl")
+    d.box("b4", 1480, 400, 640, 140, "el watermark avanza sólo hasta el último día\ncompleto SIN huecos antes: lo que falte,\nla próxima corrida lo vuelve a pedir", "violeta", 17, icon="server")
+    d.arrow("b3", "b4", sides="bt")
+    d.note(40, 700, 2120, 70, "Lección: el quality gate encontró el bug, no los tests. Los tests ahora usan un reloj simulado que avanza con la espera entre rondas.", "amarillo", 18)
+    return d
+
+
+# ------------------------------------------------------------------------------------ 13 SCD2 e identidad
+def scd2() -> Diagram:
+    d = Diagram("13_scd2_identidad", "Silver II · Historia (SCD2) e identidad")
+    d.heading(40, 20, "Del CDC del core a 'qué sabíamos de este cliente en cada momento', y de dos números de cliente a una persona")
+    d.zone(40, 130, 1140, 600, "SCD2: una versión nueva sólo si cambió algo", "azul", icon="database")
+    evs = [("e1", "I · 2019\nalta en Cuyo", "azul"), ("e2", "U · 2023\ncambia de segmento", "azul"),
+           ("e3", "I · mar-2024\nrecarga del core nuevo", "gris"), ("e4", "D · 2025\nbaja", "rojo")]
+    for i, (k, t, c) in enumerate(evs):
+        d.box(k, 80 + i * 270, 200, 240, 110, t, c, 17)
+    for a, b in (("e1", "e2"), ("e2", "e3"), ("e3", "e4")):
+        d.arrow(a, b, sides="rl")
+    vers = [("v1", "versión 1\nvalid_from 2019\nvalid_to 2023", "verde"), ("v2", "versión 2\nvalid_from 2023\nvalid_to 2025", "verde"),
+            ("v4", "versión 3 · BAJA\nis_current = true", "rojo")]
+    xs = {"v1": 80, "v2": 350, "v4": 890}
+    for k, t, c in vers:
+        d.box(k, xs[k], 420, 240, 130, t, c, 17, icon="delta")
+    d.arrow("e1", "v1", sides="bt")
+    d.arrow("e2", "v2", sides="bt")
+    d.arrow("e4", "v4", sides="bt")
+    d.box("x3", 620, 420, 240, 130, "no abre versión:\nmismo hash (R08)", "gris", 17, dashed=True)
+    d.arrow("e3", "x3", sides="bt", dashed=True)
+    d.note(80, 590, 1060, 80, "R08: el core nuevo mandaba 'Belén' y el viejo 'Belen'. El control de cambios usa el nombre NORMALIZADO\n(sin acentos, mayúsculas): el nombre para mostrar es tipo 1 y no abre versiones.")
+    d.zone(1240, 130, 920, 600, "identidad: la fusión de 2008 (DAT-08)", "naranja", icon="user")
+    d.box("c1", 1280, 200, 380, 120, "CUY-0001234\nBelén Pérez · DNI 30.111.222", "naranja", 17, icon="user")
+    d.box("c2", 1280, 360, 380, 120, "NOA-0045678\nBELEN PEREZ · DNI 30.111.222", "naranja", 17, icon="user")
+    d.box("rule", 1720, 270, 400, 140, "mismo DNI +\nmismo nombre normalizado", "amarillo", 17, shape="diamond")
+    d.box("p", 1720, 470, 400, 160, "persona_id = CUY-0001234\n(el número más viejo)\ncustomer_xref", "verde", 17, icon="delta")
+    d.arrow("c1", "rule", sides="rl")
+    d.arrow("c2", "rule", sides="rl")
+    d.arrow("rule", "p", sides="bt")
+    d.note(1280, 540, 400, 110, "Gold cuenta PERSONAS, no\nnúmeros de cliente: 'cuántos\nclientes tenemos' no se infla.")
+    return d
+
+
+# ------------------------------------------------------------------------------------- 14 modelo estrella
+def estrella() -> Diagram:
+    d = Diagram("14_modelo_estrella", "Gold · El modelo dimensional (y los marts que usa Genie)")
+    d.heading(40, 20, "Hechos al centro, dimensiones alrededor. Montos en su moneda y SIEMPRE también importe_ars e importe_usd")
+    d.box("f_mov", 760, 330, 340, 130, "fact_movimiento\nun movimiento de cuenta", "naranja", 17, icon="delta")
+    d.box("f_aut", 760, 510, 340, 130, "fact_autorizacion\n(+ su liquidación)", "naranja", 17, icon="delta")
+    d.box("f_sal", 760, 690, 340, 130, "fact_saldo_diario\nsaldo de cierre informado", "naranja", 17, icon="delta")
+    dims = [("d_fecha", 260, 200, "dim_fecha\nferiados + dólar oficial"), ("d_cli", 260, 420, "dim_cliente\nSCD2 + persona"),
+            ("d_cta", 260, 640, "dim_cuenta"), ("d_suc", 260, 860, "dim_sucursal"),
+            ("d_tar", 1300, 300, "dim_tarjeta"), ("d_com", 1300, 520, "dim_comercio\nrubro, país")]
+    for k, x, y, t in dims:
+        d.box(k, x, y, 320, 120, t, "azul", 17, icon="database")
+    for f in ("f_mov", "f_sal"):
+        for k in ("d_fecha", "d_cta"):
+            d.arrow(f, k, sides="lr", dashed=True, color="#1971c2")
+    d.arrow("f_mov", "d_cli", sides="lr", dashed=True, color="#1971c2")
+    d.arrow("d_cta", "d_suc", sides="bt", dashed=True, color="#1971c2")
+    for k in ("d_tar", "d_com"):
+        d.arrow("f_aut", k, sides="rl", dashed=True, color="#1971c2")
+    d.arrow("f_aut", "d_fecha", sides="lr", dashed=True, color="#1971c2")
+    d.zone(1720, 130, 440, 860, "marts (tablas anchas)", "verde", icon="bar_chart")
+    marts = [("mart_cliente_360", "Comercial"), ("mart_fraude_diario", "Tarjetas y fraude"),
+             ("mart_tesoreria_mensual", "Finanzas"), ("mart_conciliacion_tarjetas", "Operaciones"),
+             ("mart_pipeline_comercial", "Comercial (CRM)")]
+    for i, (m, area) in enumerate(marts):
+        d.box(f"m{i}", 1760, 190 + i * 155, 360, 120, f"{m}\n{area}", "verde", 16, icon="genie")
+    d.box("crm", 760, 880, 340, 110, "CRM: dim_cuenta_crm\nfact_oportunidad · fact_caso", "rosa", 16, icon="user")
+    return d
+
+
+# ----------------------------------------------------------------------------------------- 15 pirámide Genie
+def piramide_genie() -> Diagram:
+    d = Diagram("15_piramide_genie", "Qué hace que Genie responda bien (y qué arreglar primero)")
+    d.heading(40, 20, "Si un benchmark falla, se arregla de abajo hacia arriba: las instrucciones del agent son lo último")
+    capas = [  # de arriba (lo último) a abajo (lo primero)
+        ("instrucciones del agent", "reglas de negocio que no están en los datos", "rosa", "genie"),
+        ("ejemplos SQL", "preguntas típicas con su SQL correcto", "violeta", "notebooks"),
+        ("funciones certificadas fn_*", "lógica que no se puede equivocar (fraude, posición USD)", "violeta", "settings"),
+        ("metric views mv_*", "las métricas oficiales, con sinónimos", "azul", "dashboards"),
+        ("comentarios en tablas y columnas", "qué significa cada cosa, en castellano", "turquesa", "unity_catalog"),
+        ("gold con el grano correcto", "marts anchos, nombres claros, montos en ARS y USD", "amarillo", "delta"),
+        ("datos limpios y conciliados", "silver + quality gate", "verde", "lakehouse"),
+    ]
+    for i, (t, sub, c, ic) in enumerate(capas):
+        w = 620 + i * 170
+        x = 880 - w / 2
+        d.box(f"c{i}", x, 150 + i * 120, w, 100, f"{t}\n{sub}", c, 18, icon=ic)
+    d.box("bench", 1780, 150, 380, 220, "benchmarks\n(genie/src/*.yml)\nmedidos con\nscripts/genie_benchmark.py", "gris", 17, icon="bar_chart")
+    d.arrow("bench", "c0", "si falla uno...", sides="lr", dashed=True)
+    d.box("orden", 1780, 520, 380, 300, "...se mira primero\nla base: ¿el dato\nestá bien?, ¿el grano?,\n¿el comentario?,\n¿hay una métrica?", "amarillo", 17)
+    d.arrow("bench", "orden", sides="bt")
+    return d
+
+
+# ------------------------------------------------------------------------------------ 16 operar con el caos
+def operacion() -> Diagram:
+    d = Diagram("16_operacion", "Operar con el caos: llegó el mail de que falló el job diario")
+    d.heading(40, 20, "Primero: ¿qué tarea falló? Cada una tiene su tabla de ops para mirar y su arreglo típico")
+    d.box("mail", 40, 420, 280, 140, "mail: falló\nandes-bank-lakehouse", "rojo", icon="error")
+    casos = [
+        ("landing_sync", "ops.landing_files", "SAS vencida o rotada →\nscripts/azure/02_secrets.sh", "storage"),
+        ("bronze_api / bronze_crm", "ops.api_calls\nops.api_reconciliation", "API caída: la tarea reintenta sola;\nlos días incompletos vuelven mañana", "server"),
+        ("bronze_files", "_rescued_data\nUNKNOWN_FIELD", "columna nueva: el stream se\nreinicia con el esquema nuevo", "streaming"),
+        ("silver / gold", "silver.quarantine", "un formato nuevo del origen:\nfunción nueva en transforms.py", "delta"),
+        ("quality_gate", "ops.dq_results", "regla fail → su ID del catálogo\n→ dónde se arregla (docs/03)", "settings"),
+    ]
+    for i, (task, mira, arreglo, ic) in enumerate(casos):
+        y = 140 + i * 175
+        d.box(f"t{i}", 420, y, 400, 140, task, "naranja", 18, icon=ic)
+        d.box(f"m{i}", 880, y, 440, 140, f"mirá\n{mira}", "gris", 17, icon="bar_chart")
+        d.box(f"a{i}", 1380, y, 520, 140, arreglo, "verde", 17)
+        d.arrow("mail", f"t{i}", sides="rl", via=[(370, 490), (370, y + 70)])
+        d.arrow(f"t{i}", f"m{i}", sides="rl")
+        d.arrow(f"m{i}", f"a{i}", sides="rl")
+    d.box("genie", 1960, 420, 200, 140, "o preguntale\nal Genie de\nPlataforma", "rosa", 17)
+    d.note(40, 1040, 2120, 60, "Regla de oro: re-correr cualquier tarea es seguro. Todas las escrituras son idempotentes (watermarks, MERGE, replace_where).", "amarillo", 18)
+    return d
+
+
 # --------------------------------------------------------------------------------------- 99 catálogo de íconos
 def iconos() -> Diagram:
     d = Diagram("99_iconos", "Íconos disponibles")
@@ -335,7 +601,7 @@ def iconos() -> Diagram:
     return d
 
 
-DIAGRAMS = [panorama, fuentes, ingesta, silver, gold, genie, despliegue, api, iconos]
+DIAGRAMS = [panorama, fuentes, ingesta, silver, gold, genie, despliegue, api, linea_de_tiempo, generador, landing, incremental, dia_incompleto, scd2, estrella, piramide_genie, operacion, iconos]
 
 
 def main() -> None:
