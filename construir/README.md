@@ -10,8 +10,16 @@
 
 ## Para quién es
 
-Para alguien que programa un poco (funciones de Python, un `SELECT` con `GROUP BY`) y quiere aprender en serio
-**Databricks Free Edition**, **Azure** y **Genie**, con un problema que se parece al de un banco real.
+Para alguien que **arranca de cero**: no hace falta saber programar, usar una terminal ni Git. El capítulo 00 explica
+las palabras y las herramientas, y cada capítulo explica cada archivo y cada bloque de código: **qué hace, por qué así y
+qué NO hace**.
+
+**Todo se hace en la nube**, sin instalar nada en tu computadora: el repo se abre en **GitHub Codespaces** (una
+computadora Linux en el navegador, con Python, Java y las CLIs de Azure y Databricks ya instaladas por el
+`.devcontainer/` del repo). Funciona igual desde Windows, Mac o Linux.
+
+> **Estado de la reescritura:** los capítulos **00 a 04** ya están en la versión "desde cero" (cada archivo completo y
+> explicado). Del 05 en adelante todavía tienen la versión anterior, más resumida; se van reescribiendo por etapas.
 
 ## Qué vas a saber hacer al terminar
 
@@ -39,13 +47,14 @@ Antes de empezar, mirá los [diagramas](../docs/diagramas/README.md): uno por fa
 
 | # | capítulo | tag al terminar | tiempo |
 |---|---|---|---|
-| 00 | este documento | — | 15 min |
+| — | este documento | — | 15 min |
+| 00 | [Antes de empezar: las palabras y las herramientas](00_antes_de_empezar.md) | — | 1 h |
 | **Parte 0 · Accesos** | | | |
 | 01 | [Borrar todo (y guardar la referencia)](01_borrar_todo.md) | — | 45 min |
-| 02 | [Cuentas y herramientas: Free Edition, Azure con presupuesto, CLIs](02_cuentas_y_herramientas.md) | — | 2 h |
+| 02 | [Cuentas, Codespaces y las herramientas](02_cuentas_y_herramientas.md) | — | 2 h |
 | 03 | [*Spike* de Free Edition: qué se puede y qué no](03_spike_free_edition.md) ([ADR 0001](../docs/adr/0001_free_edition_acceso_saliente.md)) | — | 1 h 30 |
 | **Parte 1 · Fuentes (la empresa simulada)** | | | |
-| 04 | [Cimientos del repo: paquete, configuración, CUIT/CBU](04_cimientos_del_repo.md) | `etapa-02` | 2 h |
+| 04 | [Cimientos del repo: carpetas, paquete, configuración, CUIT/CBU](04_cimientos_del_repo.md) | `etapa-02` | 4-5 h |
 | 05 | [La empresa en código: sucursales, clientes, cuentas, tarjetas](05_la_empresa_en_codigo.md) | `etapa-03` | 3 h |
 | 06 | [Movimientos, tarjetas y saldos (y por qué crecían sin techo)](06_movimientos_tarjetas_y_saldos.md) | `etapa-03` | 3 h |
 | 07 | [Exportes sucios del core y del procesador](07_exportes_sucios.md) | `etapa-04` | 3 h |
@@ -107,4 +116,5 @@ bash scripts/etapas.sh --push      # los crea y los sube (hace falta permiso de 
   `andes_bank` y en la configuración de la Function App.
 - **Cuidá el presupuesto.** Todo el proyecto cuesta centavos por mes en Azure y USD 0 en Databricks. Si
   ves otra cosa, pará y revisá (capítulo 08).
-- **Los tests primero.** Cada etapa se prueba en local (Spark + Delta) antes de subirla a Databricks.
+- **Los tests primero.** Cada etapa se prueba en el codespace (Spark + Delta) antes de subirla a Databricks.
+- **Apagá el codespace** cuando terminás (☰ → *Codespaces: Stop Current Codespace*): la cuota gratis es por horas.

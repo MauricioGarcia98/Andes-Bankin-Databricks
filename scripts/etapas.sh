@@ -11,7 +11,7 @@ cd "$(dirname "$0")/.."
 REF="${REF:-origin/main}"
 
 declare -A ETAPAS=(
-  [02]="pyproject.toml src/andes_bank/config.py src/andes_bank/utils/ids.py src/andes_bank/utils/spark.py tests/test_ids.py tests/test_config.py"
+  [02]=".devcontainer .gitignore pyproject.toml src/andes_bank/config.py src/andes_bank/utils/ids.py src/andes_bank/utils/spark.py tests/test_ids.py tests/test_config.py"
   [03]="src/andes_bank/generator/reference.py src/andes_bank/generator/rand.py src/andes_bank/generator/entities.py src/andes_bank/generator/events.py src/andes_bank/generator/truth.py"
   [04]="src/andes_bank/generator/exports.py tests/test_exports.py"
   [05]="scripts/azure"

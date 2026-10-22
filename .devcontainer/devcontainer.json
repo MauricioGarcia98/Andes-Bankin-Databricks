@@ -1,0 +1,24 @@
+// El entorno de trabajo del proyecto en GitHub Codespaces: una computadora en la nube con todo instalado.
+// GitHub lo lee al crear el codespace (botón "Code → Codespaces → Create codespace on main").
+{
+  "name": "Andes Bank",
+  // la base: Linux (Debian) con Python 3.12 ya instalado
+  "image": "mcr.microsoft.com/devcontainers/python:1-3.12-bookworm",
+  "features": {
+    // Java 17: Spark corre sobre Java (los tests en local lo necesitan)
+    "ghcr.io/devcontainers/features/java:1": { "version": "17", "jdkDistro": "tem" },
+    // la CLI de Azure: el comando `az`
+    "ghcr.io/devcontainers/features/azure-cli:1": {},
+    // Node: sólo para exportar los diagramas a SVG (capítulo de diagramas)
+    "ghcr.io/devcontainers/features/node:1": { "version": "22" }
+  },
+  // Spark local necesita memoria: al menos 2 núcleos y 8 GB (la máquina chica de Codespaces alcanza)
+  "hostRequirements": { "cpus": 2, "memory": "8gb" },
+  // se corre UNA vez, cuando se crea el codespace
+  "postCreateCommand": "bash .devcontainer/post_create.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": ["ms-python.python", "charliermarsh.ruff", "databricks.databricks", "redhat.vscode-yaml"]
+    }
+  }
+}

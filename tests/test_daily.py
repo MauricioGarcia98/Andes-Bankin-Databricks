@@ -8,7 +8,7 @@ from pyspark.sql import Window
 from pyspark.sql import functions as F
 
 from andes_bank.config import local_config
-from andes_bank.generator import daily
+from andes_bank.generator import daily, exports
 from andes_bank.generator.truth import generate_truth
 from andes_bank.generator.upload import api_uploads, core_uploads
 from andes_bank.setup import create_namespace
@@ -25,6 +25,10 @@ def bank(spark, tmp_path_factory):
                   start_date=date(2026, 7, 1), end_date=BASE_END)
     create_namespace(spark, cfg)
     generate_truth(spark, cfg)
+    exports.export_all(spark, cfg)
+    # R20: la historia no entrega nada después de su último día (si no, el día nuevo lo encontraría ya subido a medias)
+    late = [u.name for u in list(api_uploads(cfg)) + list(core_uploads(cfg)) if "/2026/09/3" in u.name or "/2026/10/" in u.name]
+    assert late == [], late[:5]
     before = {t: spark.table(cfg.table("sim", t)).count() for t in ("authorizations", "transactions")}
     assert daily.days_to_generate(spark, cfg, UNTIL)[0] == date(2026, 9, 30)
     out = daily.run_new_days(spark, cfg, until=UNTIL)                 # sin SAS: genera y exporta, no sube

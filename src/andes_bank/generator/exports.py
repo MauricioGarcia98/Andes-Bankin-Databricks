@@ -47,6 +47,13 @@ def _only_day(df: DataFrame, col: str, day: date | None) -> DataFrame:
     return df if day is None else df.where(F.col(col) == _d(day))
 
 
+def _delivered(df: DataFrame, cfg: ProjectConfig, day: date | None) -> DataFrame:
+    """Lo entregado hasta `end_date` (y sólo `day` si viene). Sin el tope, la historia entregaba días que todavía no
+    habían terminado (compras informadas tarde, saldos de movimientos de después de las 21 h) y el día nuevo los
+    encontraba ya subidos, a medias (bitácora R20)."""
+    return _only_day(df.where(F.col("delivery_date") <= _d(cfg.end_date)), "delivery_date", day)
+
+
 def _ar_number(col: Column) -> Column:
     """1234.5 → '1.234,50' (formato argentino del core viejo)."""
     return F.translate(F.format_number(col, 2), ",.", ".,")
@@ -298,8 +305,7 @@ def write_transactions(spark: SparkSession, cfg: ProjectConfig, day: date | None
 
 
 def write_balances(spark: SparkSession, cfg: ProjectConfig, day: date | None = None) -> str:
-    b = _only_day(spark.table(cfg.table("sim", "balances")).withColumn("delivery_date", F.col("balance_date")),
-                  "delivery_date", day)
+    b = _delivered(spark.table(cfg.table("sim", "balances")).withColumn("delivery_date", F.col("balance_date")), cfg, day)
     legacy = [
         F.col("account_id").alias("NRO_CUENTA"), F.date_format("balance_date", "dd/MM/yyyy").alias("FECHA_SALDO"),
         _ar_number(F.col("closing_balance")).alias("SALDO_CIERRE"),
@@ -341,7 +347,7 @@ def write_cards_legacy(spark: SparkSession, cfg: ProjectConfig, day: date | None
     out = {}
     for name, df in (("autorizaciones", auth), ("liquidaciones", sett)):
         path = cfg.staging_path(f"cards_legacy/{name}")
-        (_only_day(df, "delivery_date", day).repartition("delivery_date").write.mode("overwrite")
+        (_delivered(df, cfg, day).repartition("delivery_date").write.mode("overwrite")
          .option("partitionOverwriteMode", "dynamic").partitionBy("delivery_date").json(path))
         out[name] = path
     return out
@@ -366,7 +372,7 @@ def write_api_data(spark: SparkSession, cfg: ProjectConfig, day: date | None = N
     out = {}
     for name, df in (("authorizations", auth), ("settlements", sett)):
         path = cfg.staging_path(f"api_data/{name}")
-        (_only_day(df, "delivery_date", day).repartition("delivery_date").sortWithinPartitions("delivery_date", df.columns[0])
+        (_delivered(df, cfg, day).repartition("delivery_date").sortWithinPartitions("delivery_date", df.columns[0])
          .write.mode("overwrite").option("partitionOverwriteMode", "dynamic").partitionBy("delivery_date").json(path))
         out[name] = path
     return out

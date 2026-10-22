@@ -289,8 +289,11 @@ def run_new_days(spark: SparkSession, cfg: ProjectConfig, sas_token: str | None 
         counts = generate_day(spark, cfg, day)
         exports.export_all(spark, replace(cfg, end_date=day), day=day)
         if sas_token:
-            counts["uploaded"] = upload_all(replace(cfg, end_date=day), sas_token, start=day, end=day,
-                                            parts=("core", "api_data"))
+            cfg_d = replace(cfg, end_date=day)
+            # archivos del core: nunca se pisan (un archivo ya aterrizado que cambia es CHANGED en landing_sync)
+            counts["uploaded"] = upload_all(cfg_d, sas_token, start=day, end=day, parts=("core",))
+            # páginas de la API: el día se publica entero y pisa lo que hubiera (no se "aterriza": se pide por HTTP)
+            counts["uploaded"] |= upload_all(cfg_d, sas_token, start=day, end=day, parts=("api_data",), skip_existing=False)
         record_generated_day(spark, cfg, day, counts)
         out.append({"day": day.isoformat(), **counts})
     return out
