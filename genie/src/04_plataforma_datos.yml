@@ -74,7 +74,7 @@ benchmarks:
 - q: ¿Cuántos pedidos a las APIs fallaron?
   sql: SELECT count(*) FROM ${catalog}.semantic.v_api_llamadas WHERE resultado <> 'OK'
 - q: ¿Cuántos rate limit (429) devolvió la API de tarjetas?
-  sql: SELECT count(*) FROM ${catalog}.semantic.v_api_llamadas WHERE status_code = 429
+  sql: SELECT count(*) FROM ${catalog}.semantic.v_api_llamadas WHERE status_code = 429 AND recurso IN ('autorizaciones', 'liquidaciones')
 - q: ¿Cuántos días de la API quedaron incompletos?
   sql: SELECT count(*) FROM (SELECT resource, day, max_by(complete, checked_at) AS ok FROM ${catalog}.ops.api_reconciliation GROUP BY ALL) WHERE NOT ok
 - q: ¿Cuántas compras con débito del procesador no aparecen en el core?

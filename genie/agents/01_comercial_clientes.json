@@ -30,6 +30,12 @@
           "question": [
             "¿Qué sucursal tiene más clientes con tarjeta de crédito?"
           ]
+        },
+        {
+          "id": "f073016dcf84a818c7dabb7500594f27",
+          "question": [
+            "¿Cuánto pipeline abierto hay por producto en el CRM?"
+          ]
         }
       ]
     },
@@ -42,10 +48,22 @@
           "identifier": "${catalog}.gold.dim_cuenta"
         },
         {
+          "identifier": "${catalog}.gold.dim_cuenta_crm"
+        },
+        {
           "identifier": "${catalog}.gold.dim_sucursal"
         },
         {
+          "identifier": "${catalog}.gold.fact_caso"
+        },
+        {
+          "identifier": "${catalog}.gold.fact_oportunidad"
+        },
+        {
           "identifier": "${catalog}.gold.mart_cliente_360"
+        },
+        {
+          "identifier": "${catalog}.gold.mart_pipeline_comercial"
         },
         {
           "identifier": "${catalog}.semantic.mv_clientes"
@@ -66,11 +84,26 @@
             "- Montos en pesos sin decimales y con separador de miles. Si piden dólares usá las columnas *_usd.\n",
             "- Para la ficha de un cliente puntual usá fn_resumen_cliente('<cliente_id>').\n",
             "- DNI, CUIT, email y teléfono pueden salir enmascarados según los permisos del usuario: no es un error.\n",
-            "- Cada usuario ve sólo las regiones que tiene asignadas (filtro de fila): si faltan regiones, es por permisos."
+            "- Cada usuario ve sólo las regiones que tiene asignadas (filtro de fila): si faltan regiones, es por permisos.\n",
+            "- CRM comercial (desde jun-2024): oportunidades en gold.fact_oportunidad, reclamos y consultas en gold.fact_caso,\n",
+            "  cuentas del CRM en gold.dim_cuenta_crm. Se unen al core por persona_id. \"Pipeline\" = oportunidades abiertas\n",
+            "  (cerrada = false); \"ganado\" = ganada = true. Las cuentas duplicadas del CRM ya están unificadas en cuenta_principal_id:\n",
+            "  contá empresas con COUNT(DISTINCT cuenta_principal_id), nunca contando filas de dim_cuenta_crm.\n",
+            "- metodo_match dice cómo se unió la cuenta del CRM al core (ID_CORE, CUIT o SIN_MATCH). Los prospectos no son clientes."
           ]
         }
       ],
       "example_question_sqls": [
+        {
+          "id": "2e79db4bf0bf7971823c69f5ce6340ab",
+          "question": [
+            "¿Qué porcentaje de las cuentas de clientes del CRM no se pudo unir al core?"
+          ],
+          "sql": [
+            "SELECT round(100 * avg(CASE WHEN metodo_match = 'SIN_MATCH' THEN 1 ELSE 0 END), 1) AS pct_sin_match\n",
+            "FROM ${catalog}.gold.dim_cuenta_crm WHERE tipo != 'Prospect' AND NOT es_duplicada"
+          ]
+        },
         {
           "id": "604fa107359581bb841ee8b9fcc57041",
           "question": [
@@ -111,6 +144,16 @@
           "sql": [
             "SELECT segmento, count(*) AS clientes, round(avg(cantidad_productos), 2) AS productos_promedio\n",
             "FROM ${catalog}.gold.mart_cliente_360 WHERE estado = 'ACTIVO' GROUP BY segmento ORDER BY clientes DESC"
+          ]
+        },
+        {
+          "id": "c4932e151999dd6d960228ca28dad67f",
+          "question": [
+            "Pipeline abierto por producto"
+          ],
+          "sql": [
+            "SELECT producto, count(*) AS oportunidades, round(sum(monto_ars), 0) AS pipeline_ars\n",
+            "FROM ${catalog}.gold.fact_oportunidad WHERE NOT cerrada GROUP BY producto ORDER BY pipeline_ars DESC NULLS LAST"
           ]
         }
       ],
@@ -180,6 +223,20 @@
           ]
         },
         {
+          "id": "45c3231022c54febe8b31b5acc30ceae",
+          "question": [
+            "¿Cuántas empresas distintas hay cargadas en el CRM?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT count(DISTINCT cuenta_principal_id) FROM ${catalog}.gold.dim_cuenta_crm"
+              ]
+            }
+          ]
+        },
+        {
           "id": "4ed4ff20aa475fcf7dbed6d019acb814",
           "question": [
             "¿Cuántos clientes tienen tarjeta de crédito?"
@@ -203,6 +260,20 @@
               "format": "SQL",
               "content": [
                 "SELECT count(DISTINCT persona_id) FROM ${catalog}.gold.mart_cliente_360"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "5c1de828a3ebcfafede8ac45df9e31fe",
+          "question": [
+            "¿Qué producto tiene más oportunidades ganadas?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT producto FROM ${catalog}.gold.fact_oportunidad WHERE ganada GROUP BY producto ORDER BY count(*) DESC LIMIT 1"
               ]
             }
           ]
@@ -245,6 +316,20 @@
               "format": "SQL",
               "content": [
                 "SELECT count(*) FROM ${catalog}.gold.mart_cliente_360 WHERE cobra_sueldo AND NOT tiene_tarjeta_credito AND estado = 'ACTIVO'"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ad8f1793d874a647341e881c2b2eb201",
+          "question": [
+            "¿Cuántos casos abiertos hay en el CRM?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT count(*) FROM ${catalog}.gold.fact_caso WHERE NOT cerrado"
               ]
             }
           ]
@@ -315,6 +400,20 @@
               "format": "SQL",
               "content": [
                 "SELECT count(*) FROM ${catalog}.gold.mart_cliente_360"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "da51157b70129d36494b287fae1e10df",
+          "question": [
+            "¿Cuántas oportunidades abiertas hay en el CRM?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT count(*) FROM ${catalog}.gold.fact_oportunidad WHERE NOT cerrada"
               ]
             }
           ]

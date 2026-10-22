@@ -33,6 +33,7 @@ AS SELECT run_id, called_at, to_date(called_at) AS fecha, method, endpoint,
           CASE WHEN endpoint LIKE '%authorizations%' THEN 'autorizaciones'
                WHEN endpoint LIKE '%settlements%' THEN 'liquidaciones'
                WHEN endpoint LIKE 'fx/%' THEN 'cotizaciones (espejo)'
+               WHEN endpoint LIKE 'crm/%' THEN 'crm'
                WHEN endpoint LIKE '%oauth%' THEN 'token' ELSE endpoint END AS recurso,
           status_code,
           CASE WHEN status_code = 200 AND error IS NULL THEN 'OK'

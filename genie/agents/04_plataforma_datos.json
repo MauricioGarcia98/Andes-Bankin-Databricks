@@ -267,7 +267,7 @@
             {
               "format": "SQL",
               "content": [
-                "SELECT count(*) FROM ${catalog}.semantic.v_api_llamadas WHERE status_code = 429"
+                "SELECT count(*) FROM ${catalog}.semantic.v_api_llamadas WHERE status_code = 429 AND recurso IN ('autorizaciones', 'liquidaciones')"
               ]
             }
           ]
