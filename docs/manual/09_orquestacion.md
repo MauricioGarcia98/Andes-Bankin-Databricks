@@ -16,7 +16,7 @@ despliega con la CLI. Nada se crea a mano en la interfaz.
 databricks bundle validate
 databricks bundle deploy -t dev                 # sube src/, notebooks/, sql/… y crea/actualiza los jobs
 databricks bundle run andes_fuentes -t dev      # simula los sistemas origen y los sube a Azure
-databricks bundle run andes_lakehouse -t dev    # o esperar a las 7 de la mañana
+databricks bundle run andes_dia -t dev --params dias=3   # simula 3 días nuevos y corre el lakehouse hasta ahí
 ```
 
 | sección | qué define |
@@ -26,10 +26,12 @@ databricks bundle run andes_lakehouse -t dev    # o esperar a las 7 de la mañan
 | `variables` | `catalog` (`andes_bank`), `scale_factor` (`0.1`), `start_date`, `end_date`, `warehouse_id` (buscado por nombre: `Serverless Starter Warehouse`) |
 | `targets.dev` | `mode: development`, `default: true` |
 
-**Un solo target, y por qué.** `mode: development` prefija los recursos con `[dev <usuario>]` y **pausa** los
-schedules que no dicen nada. Free Edition tiene **un solo workspace**: un target `prod` en el mismo workspace creaba
-jobs duplicados. Se dejó sólo `dev`, y el job del lakehouse declara `pause_status: UNPAUSED` explícitamente para correr
-todos los días (en modo development es la única forma de que un schedule quede activo).
+**Un solo target, y por qué.** `mode: development` prefija los recursos con `[dev <usuario>]`. Free Edition tiene **un
+solo workspace**: un target `prod` en el mismo workspace creaba jobs duplicados. Se dejó sólo `dev`.
+
+**Ningún job tiene horario.** Los datos son simulados: no hay un "día real" que esperar. Todo se corre **a pedido**,
+cuando se quiere mostrar o probar el pipeline (al principio el lakehouse corría todos los días a las 7 y el día nuevo a
+las 5; se sacó porque gastaba cuota de Free Edition sin aportar nada a un proyecto de demostración).
 
 **CLI:** con la versión 0.270 el deploy fallaba porque la clave de firma de Terraform había vencido; con 0.290 funciona.
 
@@ -60,9 +62,8 @@ setup ──► generate_truth ──► export_sources ──► upload_to_azur
 
 ### `resources/andes_lakehouse.job.yml` → job `andes-bank-lakehouse`
 
-El pipeline medallion. **Corre todos los días a las 7:00 (hora argentina)** (`quartz_cron_expression: "0 0 7 * * ?"`,
-`America/Argentina/Buenos_Aires`) y manda un mail **al usuario que lo desplegó** si falla
-(`${workspace.current_user.userName}`).
+El pipeline medallion. Se corre a mano (`databricks bundle run andes_lakehouse -t dev`) o lo lanza el job de simular
+días como su última tarea.
 
 ```
             ┌─► landing_sync ─► bronze_files ─┐
@@ -84,22 +85,28 @@ Las cuatro ingestas corren **en paralelo** (archivos y APIs no dependen entre s�
 `ops.dq_results` y une cada resultado de calidad con su corrida. Timeout de 4 horas, `max_concurrent_runs: 1`
 (dos corridas a la vez pisarían watermarks).
 
-**`end_date: ayer`.** El lakehouse procesa hasta ayer (hora argentina): `config.parse_end_date` traduce `ayer` a una
-fecha. Todo es incremental (Auto Loader, watermarks), así que cada mañana procesa sólo el día que publicó el job de
-abajo, y el quality gate vuelve a controlar gold.
+**`end_date`: hasta dónde procesar.** Por defecto, el fin de la historia (`2026-10-20`). Cuando lo lanza el job de
+simular días, le pasa el último día simulado. Todo es incremental (Auto Loader, watermarks): cada corrida procesa sólo
+lo nuevo, y el quality gate vuelve a controlar gold.
 
-### `resources/andes_dia.job.yml` → job `andes-bank-dia-nuevo`
+### `resources/andes_dia.job.yml` → job `andes-bank-dia-nuevo` (simular días)
 
-El mundo exterior sigue andando: **todos los días a las 5:00 (hora argentina)**, dos horas antes del lakehouse.
+El mundo exterior avanza **a pedido**: es la forma de mostrar el pipeline trabajando con datos nuevos (para el posteo,
+una demo o probar un cambio).
 
-| tarea | notebook | qué hace |
+```bash
+databricks bundle run andes_dia -t dev --params dias=3
+```
+
+| tarea | notebook / job | qué hace |
 |---|---|---|
-| `nuevo_dia` | 06 | `daily.run_new_days`: genera en `sim.*` cada día que falta desde el último generado hasta ayer, lo exporta (sólo ese día) y lo sube a Azure con la SAS de escritura |
-| `fx_mirror` | 04 | vuelve a copiar la serie real del BCRA (hasta ayer) al espejo |
+| `nuevo_dia` | 06 | `daily.run_new_days(days=3)`: simula los 3 días siguientes al último generado en `sim.*`, los exporta y los sube a Azure. Deja el último día en el *task value* `ultimo_dia` |
+| `fx_mirror` | 04 | vuelve a copiar la serie real del BCRA al espejo (el BCRA real nunca se pide después de hoy) |
+| `lakehouse` | el job `andes-bank-lakehouse` (`run_job_task`) | corre el lakehouse completo con `end_date = {{tasks.nuevo_dia.values.ultimo_dia}}` |
 
-Si un día el job no corre (o falla), al siguiente genera los días que faltan, en orden. Y si el lakehouse corre antes
-de que el día esté publicado, la API devuelve totales en 0: el día queda como "no publicado", no se concilia ni se
-escribe, y el watermark no lo saltea (ver [04 · Ingesta](04_ingesta.md)).
+Los días simulados **no siguen el calendario**: se pueden simular 30 días en una tarde. Si el lakehouse corre antes de
+que un día esté publicado, la API devuelve totales en 0: el día queda como "no publicado", no se concilia ni se escribe,
+y el watermark no lo saltea (ver [04 · Ingesta](04_ingesta.md)).
 
 ## 3. Los notebooks (`notebooks/`)
 

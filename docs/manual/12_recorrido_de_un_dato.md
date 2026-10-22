@@ -38,7 +38,7 @@ Todo esto lo corre el job `andes-bank-fuentes` (notebooks 01, 02, 03).
 
 ## Paso 2 · El lakehouse lo va a buscar (landing y bronze)
 
-A las 7:00 arranca `andes-bank-lakehouse`.
+Corre `andes-bank-lakehouse` (a mano, o como última tarea del job que simula días).
 
 **El movimiento:**
 

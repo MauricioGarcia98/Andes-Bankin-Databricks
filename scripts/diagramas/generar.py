@@ -269,12 +269,12 @@ def despliegue() -> Diagram:
     d.box("f_crm", 960, 320, 220, 70, "crm_publish", "naranja", 17)
     d.arrow("f_setup", "f_fx", sides="bt")
     d.arrow("f_gt", "f_crm", sides="bl", via=[(810, 355)])
-    d.text(1480, 180, "Job andes-bank-dia-nuevo · 5 h", 20, "#2f9e44")
-    d.box("d_new", 1480, 220, 340, 80, "nuevo_dia: genera, exporta\ny sube el día de ayer", "verde", 17)
-    d.box("d_fx", 1860, 220, 260, 80, "fx_mirror\n(BCRA hasta ayer)", "verde", 17)
+    d.text(1480, 180, "Job andes-bank-dia-nuevo · a pedido", 20, "#2f9e44")
+    d.box("d_new", 1480, 220, 340, 80, "nuevo_dia: simula N días,\nlos exporta y los sube", "verde", 17)
+    d.box("d_fx", 1860, 220, 260, 80, "fx_mirror → corre\nel lakehouse", "verde", 17)
     d.text(1480, 330, "los dos simulan el mundo exterior:\nno son parte del lakehouse", 17, MUTED)
 
-    d.zone(400, 470, 1760, 420, "Job andes-bank-lakehouse (todos los días a las 7, hasta ayer)", "verde", icon="jobs")
+    d.zone(400, 470, 1760, 420, "Job andes-bank-lakehouse (a pedido, hasta el último día simulado)", "verde", icon="jobs")
     d.box("l_setup", 440, 650, 180, 70, "setup", "gris", 17)
     ing = [("l_sync", "landing_sync", 530), ("l_api", "bronze_api", 620), ("l_fx", "bronze_fx", 710), ("l_crm", "bronze_crm", 800)]
     for k, t, y in ing:
@@ -341,7 +341,7 @@ def linea_de_tiempo() -> Diagram:
         (1480, True, "1 abr 2025", "API v2 del\nprocesador", "v1 y v2 a la vez hasta\njun-2025 (API-09)", "violeta", "function"),
         (1710, False, "may-nov 2025", "incidentes\nde entrega", "vacío, tarde, truncado,\nduplicado (ING-01..04)", "rojo", "error"),
         (1940, True, "1 mar 2026", "wallet_type\nen la API", "campo nuevo sin\naviso (API-11)", "violeta", "function"),
-        (2170, False, "20 oct 2026", "fin de la historia;\nsigue día a día", "job 'día nuevo' a las 5:\nun día por día (daily.py)", "verde", "genie"),
+        (2170, False, "20 oct 2026", "fin de la historia;\nsigue a pedido", "job 'día nuevo': simula\nN días (daily.py)", "verde", "genie"),
     ]
     y_line = 520
     d.box("eje_i", 40, y_line - 4, 8, 8, "", "gris")
@@ -570,7 +570,7 @@ def piramide_genie() -> Diagram:
 
 # ------------------------------------------------------------------------------------ 16 operar con el caos
 def operacion() -> Diagram:
-    d = Diagram("16_operacion", "Operar con el caos: llegó el mail de que falló el job diario")
+    d = Diagram("16_operacion", "Operar con el caos: falló una corrida del lakehouse")
     d.heading(40, 20, "Primero: ¿qué tarea falló? Cada una tiene su tabla de ops para mirar y su arreglo típico")
     d.box("mail", 40, 420, 280, 140, "mail: falló\nandes-bank-lakehouse", "rojo", icon="error")
     casos = [

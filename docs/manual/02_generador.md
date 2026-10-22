@@ -335,9 +335,10 @@ Suciedad del CRM:
 
 ## 11. `daily.py`: el día nuevo
 
-**Para qué:** la historia termina el 20-oct-2026 (`config.HISTORY_END`). Sin esto, el job diario del lakehouse no
-tendría nada nuevo que procesar. El job `andes-bank-dia-nuevo` (5:00, hora argentina) agrega cada mañana el día de
-ayer: el banco "sigue vivo" y el lakehouse trabaja con datos nuevos todos los días, como en producción.
+**Para qué:** la historia termina el 20-oct-2026 (`config.HISTORY_END`). Para mostrar el pipeline procesando datos
+**nuevos** (lo incremental, los watermarks, el quality gate de cada corrida) hace falta que el banco "siga": el job
+`andes-bank-dia-nuevo` **simula a pedido** los N días siguientes (`--params dias=N`) y después corre el lakehouse hasta
+ahí. No sigue el calendario real ni tiene horario: es una simulación.
 
 **El problema de diseño:** no se puede regenerar la historia con un `end_date` más largo. Casi todo el azar depende del
 largo del período (cuántas compras tiene una tarjeta en todo el período, en qué fecha cambia de segmento un cliente):
@@ -350,14 +351,14 @@ se verificó con un hash de las 10 tablas de `sim`: la historia generada es **id
 
 | función | qué hace |
 |---|---|
-| `last_generated_day`, `days_to_generate` | el último día en `sim.generated_days` (o `HISTORY_END`) y los que faltan hasta `until` (ayer) |
+| `last_generated_day`, `days_to_generate` | el último día en `sim.generated_days` (o `HISTORY_END`) y los que faltan hasta `until` |
 | `ensure_months` | agrega a `sim.months` los meses nuevos; `reference.monthly_index_rows` repite la inflación y el dólar del último año conocido después de 2026 |
 | `daily_authorizations` | cada tarjeta activa: **4 ensayos de Bernoulli** con probabilidad `1,6 / 30,4 / 4` (≈ Poisson con media chica: la aproximación normal de la historia sirve para medias grandes, no para 0,05 por día). Con probabilidad 0,4 % anual, a una tarjeta le roban los datos ese día (ráfaga de 3 a 12 compras en rubros riesgosos). Después, `enrich_authorizations`, igual que la historia. El `i` de los eventos nuevos arranca en 1.000.000 para no chocar con los ids de la historia |
 | `daily_settlements` | las compras aprobadas de 1 a 3 días antes cuya liquidación cae hoy: `settlements_df` con `end_date = hoy`, filtrado al día. Así se liquidan también las compras del 18 al 20-oct que la historia dejó pendientes |
 | `daily_transactions` | sueldo (`income_rows` con el mes del día: cae sólo si hoy es el día que le toca a esa cuenta), movimientos propios (Bernoulli), compras con débito del día, pago del resumen (si es día 10), **cobertura** (si los débitos del día superan el saldo de una caja de ahorro, entra una transferencia al empezar el día: la historia lo evita con el saldo inicial, el día nuevo no puede) y **plazo fijo** a fin de mes (lo que excede 2,5 ingresos del saldo real). El saldo posterior sigue desde el último saldo de cada cuenta |
 | `daily_balances` | cuentas con movimiento contable ese día + la foto de fin de mes de todas las cuentas abiertas |
 | `generate_day` | **idempotente**: primero borra de `sim.*` lo que haya de ese día (hora argentina), después agrega autorizaciones, liquidaciones, movimientos y saldos, en ese orden |
-| `run_new_days` | para cada día que falta: generar → `exports.export_all(day=...)` (sólo lo que se entrega ese día, con overwrite dinámico) → `upload_all(start=end=día)` → `record_generated_day`. Un día se marca como generado recién después de subirlo |
+| `run_new_days` | `days=N` simula los N días siguientes; para cada uno: generar → `exports.export_all(day=...)` (sólo lo que se entrega ese día, con overwrite dinámico) → `upload_all(start=end=día)` → `record_generated_day`. Un día se marca como generado recién después de subirlo |
 
 **Qué no cambia:** clientes, cuentas, tarjetas, comercios y el CRM quedan como al final de la historia (no hay altas,
 bajas ni CDC nuevos). Sin novedades, el core no manda archivo de clientes ese día.

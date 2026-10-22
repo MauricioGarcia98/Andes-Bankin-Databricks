@@ -148,7 +148,7 @@ Andes-Bankin-Datbricks/
 
 | término | significado en este proyecto |
 |---|---|
-| **SF** (scale factor) | multiplicador de la cantidad de clientes: 0,1 = 50 mil (el de todos los días), 1 = 500 mil |
+| **SF** (scale factor) | multiplicador de la cantidad de clientes: 0,1 = 50 mil (el de siempre), 1 = 500 mil |
 | **la verdad** | las tablas `sim.*`: lo que "pasó de verdad", antes de ensuciarlo |
 | **contrato** | el formato que promete un archivo: columnas, separador, encoding. El core tiene dos (antes y después de mar-2024) |
 | **CDC** | *change data capture*: eventos I (alta), U (cambio), D (baja) con la foto completa del registro |

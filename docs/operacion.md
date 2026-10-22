@@ -1,7 +1,7 @@
 # Operación · Qué hacer cuando algo falla
 
-> Dos jobs corren solos todos los días: `andes-bank-dia-nuevo` a las **5:00** (genera y publica en Azure el día de
-> ayer) y `andes-bank-lakehouse` a las **7:00** (hora argentina). Los dos mandan un mail si fallan. Esta guía
+> Los jobs se corren **a pedido** (los datos son simulados: no hay horario). `andes-bank-dia-nuevo` simula N días
+> nuevos y corre el lakehouse hasta ahí: `databricks bundle run andes_dia -t dev --params dias=3`. Esta guía
 > dice qué mirar y qué hacer, tarea por tarea. **Regla de oro: re-correr cualquier tarea es seguro** (todas las
 > escrituras son idempotentes).
 
@@ -25,9 +25,8 @@ SELECT * FROM andes_bank.sim.generated_days ORDER BY day DESC LIMIT 5;   -- hast
 | qué ves | qué pasó | qué hacer |
 |---|---|---|
 | falla `nuevo_dia` con `AuthenticationFailed` | la SAS de escritura venció | `bash scripts/azure/02_secrets.sh` y re-correr |
-| falla a la mitad | Spark o Azure | re-correr: el día se borra y se rehace; no se duplica nada |
-| no corrió uno o más días | el job estuvo pausado o caído | correrlo una vez: genera todos los que faltan, en orden |
-| el lakehouse dice `not_ready_days` | corrió antes que el día nuevo | nada: el día se pide en la corrida siguiente |
+| falla a la mitad | Spark o Azure | re-correr con el mismo `dias`: el día que quedó a medias no se marcó como generado, así que se borra y se rehace |
+| el lakehouse dice `not_ready_days` | corrió con un `end_date` posterior al último día simulado | nada: ese día se pide cuando se simule |
 
 ## 3. `landing_sync`
 
@@ -100,7 +99,7 @@ bash scripts/azure/04_costo.sh            # gasto del mes del resource group; to
 Corrida el 22-oct-2026 en un catálogo aparte (`andes_bank_sf1`), con las tareas que más cómputo usan (generar la verdad
 y exportarla sucia), sin subir a Azure:
 
-| | SF 0,1 (el de todos los días) | SF 1 |
+| | SF 0,1 (el de siempre) | SF 1 |
 |---|---|---|
 | clientes | 50.764 | 507.472 |
 | cuentas | 80.666 | 805.160 |

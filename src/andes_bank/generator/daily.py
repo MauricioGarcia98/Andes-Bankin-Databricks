@@ -1,8 +1,8 @@
 """El día nuevo: el banco sigue vivo después de la historia.
 
-`generate_truth` arma de una vez la historia hasta `HISTORY_END` (20-oct-2026). Desde ahí, el job "día nuevo" corre
-todas las mañanas y agrega a `sim.*` los días que faltan hasta ayer, los exporta sucios y los sube a Azure. Así el
-lakehouse, que corre después, tiene archivos, páginas de la API y cotizaciones nuevas cada día.
+`generate_truth` arma de una vez la historia hasta `HISTORY_END` (20-oct-2026). Desde ahí, el job "día nuevo" (manual,
+con el parámetro `dias`) **simula** días siguientes: los agrega a `sim.*`, los exporta sucios, los sube a Azure y le
+pasa al lakehouse hasta qué día procesar. No sigue el calendario real: es para mostrar el pipeline con datos nuevos.
 
 Qué pasa en un día nuevo (con las MISMAS fórmulas que la historia: `events.py`):
 
@@ -76,7 +76,7 @@ def last_generated_day(spark: SparkSession, cfg: ProjectConfig) -> date:
 
 
 def days_to_generate(spark: SparkSession, cfg: ProjectConfig, until: date | None = None) -> list[date]:
-    """Del día siguiente al último generado hasta `until` (por defecto `cfg.end_date`, que en el job es ayer)."""
+    """Del día siguiente al último generado hasta `until` (por defecto `cfg.end_date`)."""
     last, until = last_generated_day(spark, cfg), until or cfg.end_date
     return [last + timedelta(days=i) for i in range(1, (until - last).days + 1)]
 
@@ -277,13 +277,18 @@ def generate_day(spark: SparkSession, cfg: ProjectConfig, day: date) -> dict[str
 
 
 def run_new_days(spark: SparkSession, cfg: ProjectConfig, sas_token: str | None = None,
-                 until: date | None = None) -> list[dict]:
-    """Genera, exporta y (con `sas_token`) sube a Azure cada día que falta hasta `until` (por defecto, ayer).
+                 until: date | None = None, days: int | None = None) -> list[dict]:
+    """Simula `days` días nuevos (o hasta `until`): los genera, los exporta y (con `sas_token`) los sube a Azure.
+
+    Es una simulación: los días no tienen que ver con el calendario real. Se piden a mano (job `andes-bank-dia-nuevo`,
+    parámetro `dias`) cuando se quiere mostrar el pipeline procesando días nuevos.
 
     Un día se marca como generado recién después de subirlo: si la subida falla, la próxima corrida lo rehace entero.
     """
     from andes_bank.generator.upload import upload_all
 
+    if days is not None:
+        until = last_generated_day(spark, cfg) + timedelta(days=days)
     out = []
     for day in days_to_generate(spark, cfg, until):
         counts = generate_day(spark, cfg, day)

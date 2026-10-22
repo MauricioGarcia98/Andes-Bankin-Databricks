@@ -14,8 +14,8 @@ reintentos, su horario y sus alertas.
 
 - **Asset Bundle:** un `databricks.yml` con variables y *targets* + archivos `resources/*.yml` con los recursos. Se
   valida (`bundle validate`), se despliega (`bundle deploy`) y se corre (`bundle run`).
-- **`mode: development`:** prefija los recursos con `[dev <usuario>]` y pausa los schedules que no dicen nada. El del
-  lakehouse dice `pause_status: UNPAUSED` a propósito: Free Edition tiene un solo workspace.
+- **`mode: development`:** prefija los recursos con `[dev <usuario>]`. Los jobs **no tienen horario**: los datos son
+  simulados, así que se corren a pedido.
 - **Notebook delgado:** cada tarea es un notebook de pocas líneas que lee widgets, arma la config y llama al paquete.
   `_bootstrap.py` hace eso una vez para todos.
 - **Serverless:** las tareas no declaran cluster: corren en el cómputo serverless de Free Edition.
@@ -43,18 +43,11 @@ targets:
 ### 2. El job del lakehouse
 
 ```yaml
-schedule:
-  quartz_cron_expression: "0 0 7 * * ?"           # todos los días a las 7
-  timezone_id: America/Argentina/Buenos_Aires
-  pause_status: UNPAUSED
-email_notifications:
-  on_failure: ["${workspace.current_user.userName}"]
+# sin horario: se corre a mano, o lo corre el job "simular días" (andes_dia) con end_date = el último día simulado
+parameters:
+  - name: end_date
+    default: ${var.end_date}
 tasks:
-  - task_key: bronze_api
-    depends_on: [{ task_key: setup }]
-    # el cliente ya reintenta cada pedido; esto es para caídas de la API más largas (el watermark retoma)
-    max_retries: 2
-    min_retry_interval_millis: 300000
 ```
 
 El orden: `setup` → (`landing_sync` → `bronze_files`) ∥ `bronze_api` ∥ `bronze_fx` ∥ `bronze_crm` → `silver` → `gold` →
@@ -79,9 +72,11 @@ def create_ops_tables(spark, cfg):
 
 ## 🤔 Por qué así
 
-- **¿Por qué dos jobs?** El de fuentes simula el mundo exterior (se corre cuando querés regenerar el banco); el del
-  lakehouse es el pipeline de verdad (corre todos los días). Mezclarlos haría que cada corrida diaria regenere 17 M de
-  movimientos.
+- **¿Por qué jobs separados?** El de fuentes simula el mundo exterior (se corre cuando querés regenerar el banco); el
+  del lakehouse es el pipeline. Mezclarlos haría que cada corrida del lakehouse regenere 17 M de movimientos. El tercero
+  (`andes_dia`, capítulo 26) simula días nuevos a pedido y después lanza el lakehouse.
+- **¿Por qué sin horario?** Al principio el lakehouse corría todos los días a las 7. Con datos simulados no aporta nada
+  y gasta cuota de Free Edition: se corre cuando se quiere mostrar o probar.
 - **¿Por qué reintentos por tarea si el cliente ya reintenta?** El cliente cubre fallas de segundos; el reintento de
   la tarea cubre una API caída 10 minutos. El watermark hace que el reintento retome donde quedó.
 
@@ -91,7 +86,7 @@ def create_ops_tables(spark, cfg):
 databricks bundle validate -t dev
 databricks bundle deploy -t dev
 databricks bundle run andes_lakehouse -t dev
-databricks jobs list | grep andes        # el lakehouse con schedule UNPAUSED
+databricks jobs list | grep andes        # los tres jobs, sin horario
 ```
 
 ## 🔥 Si falla
@@ -100,7 +95,6 @@ databricks jobs list | grep andes        # el lakehouse con schedule UNPAUSED
 |---|---|---|
 | `governance_semantic` falla: `ops.dq_results` no existe | una vista lee una tabla que crea una tarea posterior | `setup` crea vacías todas las tablas de `ops` (R11) |
 | `error downloading Terraform: openpgp: key expired` | CLI vieja | actualizá la CLI de Databricks |
-| `cannot set trigger pause status to UNPAUSED` en `presets` | development no deja des-pausar por preset | `pause_status: UNPAUSED` en el schedule del job |
 
 ## ✅ Punto de control
 

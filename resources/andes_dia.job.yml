@@ -1,20 +1,18 @@
-# Job "día nuevo": el mundo exterior sigue andando. Todas las mañanas, antes del lakehouse, genera los días que faltan
-# hasta ayer (movimientos, compras con tarjeta, liquidaciones y saldos), los sube a Azure y actualiza el espejo del BCRA.
-# Es parte de la simulación (como andes_fuentes), no del lakehouse.
+# Job "simular días": el mundo exterior avanza A PEDIDO. Se corre a mano cuando se quiere mostrar el pipeline con
+# datos nuevos (no tiene horario: los días son simulados, no siguen el calendario real).
+#
+#   databricks bundle run andes_dia -t dev --params dias=3
+#
+# 1) nuevo_dia: simula N días (sim.*), los exporta sucios y los sube a Azure
+# 2) fx_mirror: copia la serie real del BCRA al espejo
+# 3) lakehouse: corre el job del lakehouse hasta el último día simulado
 resources:
   jobs:
     andes_dia:
       name: andes-bank-dia-nuevo
-      description: Genera y publica en Azure cada día nuevo del banco simulado (hasta ayer)
+      description: "Simula días nuevos del banco (parámetro dias), los publica en Azure y corre el lakehouse hasta ahí"
       max_concurrent_runs: 1
-      timeout_seconds: 7200
-      # a las 5 (hora argentina): el lakehouse corre a las 7 y encuentra el día listo
-      schedule:
-        quartz_cron_expression: "0 0 5 * * ?"
-        timezone_id: America/Argentina/Buenos_Aires
-        pause_status: UNPAUSED
-      email_notifications:
-        on_failure: ["${workspace.current_user.userName}"]
+      timeout_seconds: 14400
       tags:
         project: andes-bank
         layer: sources
@@ -25,8 +23,8 @@ resources:
           default: ${var.scale_factor}
         - name: start_date
           default: ${var.start_date}
-        - name: end_date
-          default: ayer
+        - name: dias
+          default: "1"
       tasks:
         - task_key: nuevo_dia
           max_retries: 1
@@ -34,7 +32,16 @@ resources:
           notebook_task:
             notebook_path: ../notebooks/06_new_day.py
         - task_key: fx_mirror
+          depends_on: [{ task_key: nuevo_dia }]
           max_retries: 2
           min_retry_interval_millis: 60000
           notebook_task:
             notebook_path: ../notebooks/04_fx_mirror.py
+            base_parameters:
+              end_date: "{{tasks.nuevo_dia.values.ultimo_dia}}"
+        - task_key: lakehouse
+          depends_on: [{ task_key: fx_mirror }]
+          run_job_task:
+            job_id: ${resources.jobs.andes_lakehouse.id}
+            job_parameters:
+              end_date: "{{tasks.nuevo_dia.values.ultimo_dia}}"

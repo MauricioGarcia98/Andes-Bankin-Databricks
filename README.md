@@ -1,8 +1,8 @@
 # 🏦 Andes Bank · Lakehouse bancario E2E en Databricks Free Edition
 
 > **Estado: MVP terminado (22-oct-2026).** Las 4 fuentes llegan a bronze con el caos activado, el quality gate pasa
-> (22 de 22 reglas), los 4 Genie Agents aciertan entre el 80 y el 100 % de sus benchmarks, cada mañana un job
-> genera y publica el día de ayer (el banco sigue vivo) y el lakehouse lo procesa a las 7, y Azure costó USD 0,02 en el mes. Ver [Operación](docs/operacion.md) y
+> (22 de 22 reglas), los 4 Genie Agents aciertan entre el 80 y el 100 % de sus benchmarks, un job simula a
+> pedido días nuevos del banco y corre el lakehouse hasta ahí, y Azure costó USD 0,02 en el mes. Ver [Operación](docs/operacion.md) y
 > [el curso para reconstruirlo](construir/README.md).
 
 Andes Bank es un banco argentino **ficticio**, regulado por el BCRA. Este repo construye su plataforma de datos de
@@ -26,7 +26,7 @@ su misma estructura.
 | [06 · Plan de construcción](docs/06_plan_de_construccion.md) | las etapas de `construir/` |
 | [07 · Posteo de LinkedIn](docs/07_posteo_linkedin.md) | las preguntas para contar el proyecto |
 | [Diagramas](docs/diagramas/README.md) | el proyecto en Excalidraw, fase por fase |
-| [Operación](docs/operacion.md) | qué hacer cuando falla el job diario, y la prueba de volumen a SF 1 |
+| [Operación](docs/operacion.md) | qué hacer cuando falla un job, y la prueba de volumen a SF 1 |
 | [Manual técnico](docs/manual/README.md) | los objetivos reales y cada carpeta, archivo y pieza de código explicados: qué es, cómo funciona y por qué |
 
 ![Andes Bank: el proyecto completo](docs/diagramas/00_panorama.svg)

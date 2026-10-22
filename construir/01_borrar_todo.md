@@ -32,9 +32,8 @@ Secret scope ─guarda─► las credenciales de Azure
 Azure ────────guarda─► los archivos del banco y la API
 ```
 
-Se borra **de arriba hacia abajo**: Genie, jobs, catálogo, secretos, Azure. Si borrás Azure primero, el job diario
-(que corre solo a las 5 y a las 7) va a fallar todos los días intentando leer un Storage que no existe, y te va a
-llenar el mail de errores.
+Se borra **de arriba hacia abajo**: Genie, jobs, catálogo, secretos, Azure. Si borrás Azure primero, los jobs quedan
+apuntando a un Storage que no existe: la próxima vez que alguien los corra, fallan con errores que confunden.
 
 ### Qué cuesta plata
 
@@ -110,7 +109,7 @@ databricks bundle destroy -t dev --auto-approve
 - **Qué hace:** lee `databricks.yml` (la descripción de todo lo que el proyecto creó en Databricks) y borra los tres
   jobs (`andes-bank-fuentes`, `andes-bank-dia-nuevo`, `andes-bank-lakehouse`) y la carpeta `.bundle/andes-bank` del
   workspace. `--auto-approve` = no preguntar "¿estás seguro?".
-- **Por qué antes del catálogo y de Azure:** un job programado que corre sin datos falla y te manda mails.
+- **Por qué antes del catálogo y de Azure:** un job que quedó apuntando a cosas borradas falla en cuanto alguien lo corre.
 - **Comprobalo:** en Databricks, menú **Jobs & Pipelines**: no tiene que quedar ninguno con el prefijo `[dev …]`.
 
 ### 5. Borrar el catálogo
@@ -198,5 +197,5 @@ Desde el codespace de la referencia:
 
 ## 🏋️ Ejercicio
 
-¿Qué pasaría si borrás el secret scope **antes** que los jobs y a las 7 corre el lakehouse? Escribí en una línea qué
+¿Qué pasaría si borrás el secret scope **antes** que los jobs y alguien corre el lakehouse? Escribí en una línea qué
 tarea fallaría primero y con qué error (pista: capítulo 12).

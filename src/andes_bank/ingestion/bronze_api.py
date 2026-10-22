@@ -209,6 +209,7 @@ def bcra_page_getter(session=None, retries: int = 5, sleep=None):
     url = "https://api.bcra.gob.ar/estadisticascambiarias/v1.0/Cotizaciones/{}"
 
     def get(currency: str, desde: str, hasta: str, offset: int) -> dict:
+        hasta = min(hasta, date.today().isoformat())      # los días simulados pueden estar después de hoy
         for attempt in range(1, retries + 1):
             try:
                 r = s.get(url.format(currency), timeout=30,

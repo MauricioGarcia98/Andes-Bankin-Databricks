@@ -231,6 +231,7 @@ def fetch_bcra_series(currency: str, start: date, end: date, session=None) -> li
     import requests
 
     s = session or requests.Session()
+    end = min(end, date.today())                          # los días simulados pueden estar después de hoy
     out, offset = [], 0
     while True:
         r = s.get(BCRA_URL.format(currency=currency), timeout=30,

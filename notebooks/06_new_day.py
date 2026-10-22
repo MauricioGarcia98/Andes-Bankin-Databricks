@@ -1,11 +1,11 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # 06 · Día nuevo
+# MAGIC # 06 · Simular días nuevos
 # MAGIC
-# MAGIC El banco sigue vivo: agrega a `sim.*` cada día que falta desde el último generado hasta ayer (autorizaciones,
-# MAGIC liquidaciones, movimientos y saldos, con las mismas fórmulas que la historia), lo exporta sucio y lo sube a Azure.
-# MAGIC Corre todas las mañanas antes del lakehouse (job `andes-bank-dia-nuevo`). Re-correrlo es seguro: un día ya
-# MAGIC generado no se vuelve a generar, y uno que quedó a la mitad se borra y se rehace.
+# MAGIC El banco sigue después de la historia: agrega a `sim.*` los próximos `dias` días desde el último generado
+# MAGIC (autorizaciones, liquidaciones, movimientos y saldos, con las mismas fórmulas que la historia), los exporta sucios
+# MAGIC y los sube a Azure. Es una **simulación a pedido**, no sigue el calendario real. Deja en `ultimo_dia` hasta dónde
+# MAGIC llegó, para que el lakehouse (la tarea siguiente del job) procese exactamente esos días.
 
 # COMMAND ----------
 
@@ -21,8 +21,12 @@ import logging
 
 from andes_bank.generator.daily import last_generated_day, run_new_days
 
+dbutils.widgets.text("dias", "1", "Días a simular")
+dias = int(dbutils.widgets.get("dias"))
 logging.basicConfig(level=logging.INFO)
-print("último día generado:", last_generated_day(spark, cfg), "| hasta:", cfg.end_date)
-out = run_new_days(spark, cfg, dbutils.secrets.get("andes_bank", "blob_sas_write"))
-print(out or "nada que generar: ya está al día")
+print("último día generado:", last_generated_day(spark, cfg), "| días a simular:", dias)
+out = run_new_days(spark, cfg, dbutils.secrets.get("andes_bank", "blob_sas_write"), days=dias)
+ultimo = last_generated_day(spark, cfg)
+dbutils.jobs.taskValues.set("ultimo_dia", ultimo.isoformat())
+print(out, "| el lakehouse procesa hasta", ultimo)
 display(spark.sql(f"SELECT * FROM {cfg.table('sim', 'generated_days')} ORDER BY day DESC LIMIT 10"))

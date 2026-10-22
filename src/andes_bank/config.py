@@ -28,8 +28,8 @@ CONTAINERS = {
     "api_data": "api-data",            # lo que sirve la API de tarjetas v2 (páginas pre-armadas por día)
 }
 
-# Último día de la historia que genera `generate_truth` de una sola vez. Después, el job "día nuevo" agrega un día
-# por día (generator/daily.py), así el banco sigue vivo y el lakehouse tiene algo nuevo cada mañana.
+# Último día de la historia que genera `generate_truth` de una sola vez. Después, el job "día nuevo" simula a pedido
+# los días siguientes (generator/daily.py), para mostrar el lakehouse procesando datos nuevos.
 HISTORY_END = date(2026, 10, 20)
 TZ_AR = ZoneInfo("America/Argentina/Buenos_Aires")
 
@@ -149,7 +149,7 @@ def yesterday_ar(now: datetime | None = None) -> date:
 
 
 def parse_end_date(value: str) -> date:
-    """`end_date` de un job: una fecha ISO o `ayer` (el lakehouse y el día nuevo corren hasta ayer)."""
+    """`end_date` de un job: una fecha ISO o `ayer` (hasta ayer en hora argentina)."""
     return yesterday_ar() if value.strip().lower() == "ayer" else date.fromisoformat(value)
 
 

@@ -96,7 +96,7 @@ En Databricks cada tabla tiene un nombre de **tres niveles**: `catálogo.esquema
 ### El *scale factor*
 
 El banco puede tener 50 mil o 500 mil clientes. El **scale factor** (SF) multiplica la **cantidad de clientes**: SF 1 =
-500 mil, SF 0,1 = 50 mil (el que se usa todos los días en Free Edition), SF 0,002 = 1.000 (el de los tests). **No**
+500 mil, SF 0,1 = 50 mil (el que se usa siempre en Free Edition), SF 0,002 = 1.000 (el de los tests). **No**
 cambia los días: la historia del banco (la devaluación de dic-2023, la migración del core en mar-2024…) tiene que estar
 completa a cualquier escala, porque ahí están los problemas que se aprenden a resolver.
 
@@ -361,14 +361,14 @@ CONTAINERS = {
   y 11).
 
 ```python
-# Último día de la historia que genera `generate_truth` de una sola vez. Después, el job "día nuevo" agrega un día
-# por día (generator/daily.py), así el banco sigue vivo y el lakehouse tiene algo nuevo cada mañana.
+# Último día de la historia que genera `generate_truth` de una sola vez. Después, el job "día nuevo" simula a pedido
+# los días siguientes (generator/daily.py), para mostrar el lakehouse procesando datos nuevos.
 HISTORY_END = date(2026, 10, 20)
 TZ_AR = ZoneInfo("America/Argentina/Buenos_Aires")
 ```
 
-- `HISTORY_END`: hasta dónde llega la historia que se genera de una vez (capítulos 05 y 06). Desde ahí, el banco sigue
-  "vivo" un día por día (capítulo 26).
+- `HISTORY_END`: hasta dónde llega la historia que se genera de una vez (capítulos 05 y 06). Desde ahí, un job puede
+  **simular a pedido** días siguientes, para mostrar el pipeline procesando datos nuevos (capítulo 26).
 - `TZ_AR`: la zona horaria argentina (UTC−3 todo el año). Se usa para saber qué día es "ayer" en Argentina.
 
 ```python
@@ -581,15 +581,15 @@ def yesterday_ar(now: datetime | None = None) -> date:
 
 
 def parse_end_date(value: str) -> date:
-    """`end_date` de un job: una fecha ISO o `ayer` (el lakehouse y el día nuevo corren hasta ayer)."""
+    """`end_date` de un job: una fecha ISO o `ayer` (hasta ayer en hora argentina)."""
     return yesterday_ar() if value.strip().lower() == "ayer" else date.fromisoformat(value)
 ```
 
 - `yesterday_ar()`: el día de ayer **en Argentina**. Importa: a las 22 h de Buenos Aires ya es el día siguiente en UTC
   (la hora de los servidores). `now or datetime.now(...)`: si le pasan una hora (los tests lo hacen, para que el
   resultado no dependa de cuándo corren) usa esa; si no, la de ahora.
-- `parse_end_date("2026-10-20")` → esa fecha. `parse_end_date("ayer")` → ayer. Los jobs diarios usan `ayer` (capítulo
-  26). `strip().lower()` acepta `" Ayer "` también.
+- `parse_end_date("2026-10-20")` → esa fecha. `parse_end_date("ayer")` → ayer (sirve si algún día se quisiera correr
+  con el calendario real; hoy los jobs usan fechas). `strip().lower()` acepta `" Ayer "` también.
 
 ```python
 def config_from_widgets(dbutils) -> ProjectConfig:  # pragma: no cover - sólo Databricks

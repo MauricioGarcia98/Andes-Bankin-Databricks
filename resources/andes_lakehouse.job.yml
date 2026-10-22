@@ -7,14 +7,7 @@ resources:
       description: "Pipeline medallion de Andes Bank: core (Blob), procesador de tarjetas y CRM (API), BCRA, gold y quality gate"
       max_concurrent_runs: 1
       timeout_seconds: 14400
-      # corrida diaria a las 7 (hora argentina): todo es incremental (watermarks y Auto Loader), así que si no llegó
-      # nada nuevo termina rápido; el quality gate igual vuelve a controlar gold
-      schedule:
-        quartz_cron_expression: "0 0 7 * * ?"
-        timezone_id: America/Argentina/Buenos_Aires
-        pause_status: UNPAUSED
-      email_notifications:
-        on_failure: ["${workspace.current_user.userName}"]
+      # sin horario: se corre a mano, o lo corre el job "simular días" (andes_dia) con end_date = el último día simulado
       tags:
         project: andes-bank
         layer: all
@@ -26,8 +19,8 @@ resources:
         - name: start_date
           default: ${var.start_date}
         - name: end_date
-          # hasta ayer: el job "día nuevo" (5 h) ya publicó el día anterior en Azure
-          default: ayer
+          # hasta dónde procesar: el fin de la historia, o el último día simulado (lo pasa andes_dia)
+          default: ${var.end_date}
         - name: run_id
           default: "{{job.run_id}}"
       tasks:
