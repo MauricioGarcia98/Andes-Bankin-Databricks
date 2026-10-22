@@ -27,6 +27,7 @@ su misma estructura.
 | [07 · Posteo de LinkedIn](docs/07_posteo_linkedin.md) | las preguntas para contar el proyecto |
 | [Diagramas](docs/diagramas/README.md) | el proyecto en Excalidraw, fase por fase |
 | [Operación](docs/operacion.md) | qué hacer cuando falla el job diario, y la prueba de volumen a SF 1 |
+| [Manual técnico](docs/manual/README.md) | los objetivos reales y cada carpeta, archivo y pieza de código explicados: qué es, cómo funciona y por qué |
 
 ![Andes Bank: el proyecto completo](docs/diagramas/00_panorama.svg)
 

@@ -5,6 +5,9 @@
 > hace, por qué se hizo así y no de otra forma, qué va a fallar y cómo se arregla**. Los "🔥 Si falla" salen de la
 > [bitácora](../docs/08_bitacora.md): son errores que **pasaron de verdad** mientras se construía.
 
+> **¿Buscás la referencia y no el curso?** El [manual técnico](../docs/manual/README.md) explica cada carpeta, archivo
+> y pieza de código del proyecto terminado (qué es, cómo funciona y por qué es así), y empieza por los objetivos reales.
+
 ## Para quién es
 
 Para alguien que programa un poco (funciones de Python, un `SELECT` con `GROUP BY`) y quiere aprender en serio
