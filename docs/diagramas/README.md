@@ -16,6 +16,7 @@ Un diagrama por fase, dibujados con [Excalidraw](https://excalidraw.com). Cada u
 | 05 | [Semántica y Genie](#05--capa-semántica-y-genie) | gobierno, vistas, métricas, funciones y los 4 agents |
 | 06 | [Despliegue y jobs](#06--despliegue-ci-y-orquestación) | CI, Asset Bundles y las tareas de cada job |
 | 07 | [La API y el cliente](#07--la-api-con-caos-y-el-cliente) | cada falla inyectada y cómo se sobrevive |
+| 99 | [Íconos disponibles](#99--íconos-disponibles) | los íconos de la biblioteca de Excalidraw que usan los diagramas |
 
 ## Cómo se regeneran
 
@@ -23,6 +24,7 @@ Los diagramas son **código**: se escriben en `scripts/diagramas/generar.py` con
 (`scripts/diagramas/excali.py`). Si cambia la arquitectura, se cambia ahí y se regenera:
 
 ```bash
+python scripts/diagramas/bajar_iconos.py                # sólo si cambia la lista de íconos → iconos.json
 python scripts/diagramas/generar.py                     # → docs/diagramas/*.excalidraw
 cd scripts/diagramas && npm install && node exportar.mjs   # → docs/diagramas/*.svg  (--png para PNG)
 ```
@@ -30,6 +32,26 @@ cd scripts/diagramas && npm install && node exportar.mjs   # → docs/diagramas/
 `exportar.mjs` usa la librería de Excalidraw dentro de Chromium (Playwright) y le incrusta la tipografía, porque GitHub
 no deja que un SVG cargue fuentes externas. Si editás un `.excalidraw` a mano en excalidraw.com, exportalo a SVG desde
 ahí; pero la próxima regeneración lo pisa: para que el cambio quede, pasalo a `generar.py`.
+
+## Íconos
+
+Los íconos salen de la [biblioteca pública de Excalidraw](https://libraries.excalidraw.com) (licencia MIT, cada uno
+de su autor):
+
+| biblioteca | autor | íconos |
+|---|---|---|
+| Databricks Architecture Icons | lukethorp | Databricks, Lakeflow Jobs, Notebooks, Unity Catalog, Lakehouse, Genie, Streaming, Dashboards |
+| Azure cloud services icons | youritjang | Blob Storage, Key Vault |
+| Azure Compute / Azure Storage | 7demonsrising | Function App, Storage Accounts |
+| Some more logos | esteevens | Azure |
+| GitHub Actions | devdaejungyoon | GitHub, GitHub Actions |
+| Data Platform | chuqbach | Delta Lake, Spark, Parquet |
+| IT Logos | pclainchard | Python |
+| IT icons | mateuszbaransanok | base de datos, usuario, servidor, documento, internet, llave, error, gráfico, engranaje |
+
+`bajar_iconos.py` los baja y guarda en `scripts/diagramas/iconos.json` sólo el dibujo (sin el nombre ni los marcos
+invisibles). En `generar.py` se usan con `icon="<clave>"` en una caja o en una zona: el ícono va a la izquierda del
+texto y, si no entra, arriba. Para sumar uno, agregalo a `ICONOS` en `bajar_iconos.py` y volvé a correrlo.
 
 ## 00 · El proyecto completo
 
@@ -62,3 +84,7 @@ ahí; pero la próxima regeneración lo pisa: para que el cambio quede, pasalo a
 ## 07 · La API con caos y el cliente
 
 ![La API y el cliente](07_api_caos_cliente.svg)
+
+## 99 · Íconos disponibles
+
+![Íconos disponibles](99_iconos.svg)

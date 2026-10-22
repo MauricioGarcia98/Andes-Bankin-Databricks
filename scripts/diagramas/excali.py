@@ -7,9 +7,11 @@ VS Code). Las coordenadas son a mano, en una grilla de 20 px: así el diagrama q
 
 from __future__ import annotations
 
+import copy
 import json
 import random
 from dataclasses import dataclass, field
+from functools import cache
 from pathlib import Path
 
 # paleta (rellenos pastel + bordes) — la misma en todos los diagramas
@@ -23,11 +25,31 @@ INK = "#1e1e1e"
 MUTED = "#495057"
 FONT = 1           # 1 = Virgil (a mano), 2 = Helvetica, 3 = Cascadia (código)
 LINE = 1.25
+ICONS_FILE = Path(__file__).resolve().parent / "iconos.json"
+
+
+@cache
+def _icons() -> dict:
+    """Los íconos de la biblioteca de Excalidraw (los baja bajar_iconos.py)."""
+    return json.loads(ICONS_FILE.read_text(encoding="utf-8"))
+
+
+def _bbox(elements: list[dict]) -> tuple[float, float, float, float]:
+    """(x0, y0, ancho, alto) reales: en líneas y trazos a mano manda `points`, no `width`/`height`."""
+    xs, ys = [], []
+    for e in elements:
+        if e.get("points"):
+            xs += [e["x"] + px for px, _ in e["points"]]
+            ys += [e["y"] + py for _, py in e["points"]]
+        else:
+            xs += [e["x"], e["x"] + e["width"]]
+            ys += [e["y"], e["y"] + e["height"]]
+    return min(xs), min(ys), max(xs) - min(xs), max(ys) - min(ys)
 
 
 def _text_size(text: str, size: float, family: int = FONT) -> tuple[float, float]:
     lines = text.split("\n")
-    k = 0.6 if family == 3 else 0.55
+    k = 0.6 if family == 3 else 0.5
     return max(len(line) for line in lines) * size * k, len(lines) * size * LINE
 
 
@@ -80,9 +102,12 @@ class Diagram:
         return el
 
     def _label(self, container: dict, text: str, size: float, color: str, family: int = FONT,
-               align: str = "center", valign: str = "middle") -> dict:
+               align: str = "center", valign: str = "middle", pad_left: float = 0) -> dict:
         tw, th = _text_size(text, size, family)
-        x = container["x"] + (container["width"] - tw) / 2 if align == "center" else container["x"] + 12
+        free = container["width"] - pad_left
+        if tw > free - 12:
+            print(f"  ⚠ {self.name}: el texto no entra en {container['id']} ({tw:.0f} > {free - 12:.0f}): {text!r}")
+        x = container["x"] + pad_left + (free - tw) / 2 if align == "center" else container["x"] + 12
         y = container["y"] + (container["height"] - th) / 2 if valign == "middle" else container["y"] + 10
         tid = self._id("t")
         container["boundElements"].append({"type": "text", "id": tid})
@@ -102,19 +127,73 @@ class Diagram:
         if subtitle:
             self.text(x, y + 52, subtitle, 20, MUTED)
 
-    def zone(self, x, y, w, h, title: str, color: str = "gris", size: float = 22) -> None:
+    def zone(self, x, y, w, h, title: str, color: str = "gris", size: float = 22, icon: str | None = None) -> None:
         self._base("rectangle", self._id("z"), x, y, w, h, backgroundColor=ZONE[color], strokeColor=STROKE[color],
                    strokeWidth=1, strokeStyle="dashed", roundness={"type": 3}, roughness=0)
-        self.text(x + 16, y + 12, title, size, STROKE[color])
+        dx = 0
+        if icon:
+            iw, ih = self.icon_dims(icon, 36)
+            self.icon(icon, x + 14, y + 8 + (36 - ih) / 2, 36)
+            dx = iw + 10
+        self.text(x + 16 + dx, y + 12, title, size, STROKE[color])
 
     def box(self, bid: str, x, y, w, h, text: str, color: str = "azul", size: float = 18, shape: str = "rectangle",
-            family: int = FONT, dashed: bool = False) -> Box:
+            family: int = FONT, dashed: bool = False, icon: str | None = None, icon_size: float | None = None) -> Box:
+        """Caja con texto centrado. Con `icon`, el ícono de la biblioteca va a la izquierda y el texto se centra en
+        el espacio que queda."""
         el = self._base(shape, bid, x, y, w, h, backgroundColor=FILL[color], strokeColor=STROKE[color],
                         roundness={"type": 3} if shape == "rectangle" else {"type": 2},
                         strokeStyle="dashed" if dashed else "solid")
-        self._label(el, text, size, INK, family)
+        pad = top = 0
+        if icon:
+            tw, th = _text_size(text, size, family)
+            k = icon_size or min(h - 24, 64)
+            iw, ih = self.icon_dims(icon, k)
+            if tw > w - (16 + iw) - 24:
+                kt = min(56, h - th - 40)
+                if kt >= 32:                                  # arriba del texto, si la caja es alta
+                    iw, ih = self.icon_dims(icon, kt)
+                    gap = (h - ih - 12 - th) / 2
+                    self.icon(icon, x + (w - iw) / 2, y + gap, kt)
+                    top = gap + ih + 12 - (h - th) / 2
+                    icon = None
+                else:                                         # a la izquierda, más chico
+                    k = max(28, min(k, w - tw - 56))
+                    iw, ih = self.icon_dims(icon, k)
+            if icon:
+                self.icon(icon, x + 16, y + (h - ih) / 2, k)
+                pad = 16 + iw
+        label = self._label(el, text, size, INK, family, pad_left=pad)
+        label["y"] += top
         self.boxes[bid] = Box(bid, x, y, w, h)
         return self.boxes[bid]
+
+    @staticmethod
+    def icon_dims(key: str, size: float) -> tuple[float, float]:
+        _, _, w, h = _bbox(_icons()[key]["elements"])
+        k = size / max(w, h)
+        return w * k, h * k
+
+    def icon(self, key: str, x, y, size: float = 64) -> tuple[float, float]:
+        """Un ícono de la biblioteca (iconos.json), escalado para que su lado mayor mida `size`, con la esquina
+        superior izquierda en (x, y). Queda agrupado: en el editor se mueve como una sola pieza. Devuelve (ancho, alto)."""
+        src = _icons()[key]["elements"]
+        x0, y0, w, h = _bbox(src)
+        k = size / max(w, h)
+        group = self._id("g")
+        for e in src:
+            el = copy.deepcopy(e)
+            el.update(id=self._id("i"), x=round(x + (e["x"] - x0) * k, 2), y=round(y + (e["y"] - y0) * k, 2),
+                      width=round(e["width"] * k, 2), height=round(e["height"] * k, 2), groupIds=[group], boundElements=[], frameId=None, locked=False,
+                      strokeWidth=max(0.5, min(e.get("strokeWidth", 1) * k, 2)),
+                      seed=self._rng.randrange(1, 2**31), versionNonce=self._rng.randrange(1, 2**31))
+            if "points" in el:
+                el["points"] = [[round(px * k, 2), round(py * k, 2)] for px, py in el["points"]]
+            for b in ("startBinding", "endBinding"):
+                if b in el:
+                    el[b] = None
+            self.elements.append(el)
+        return w * k, h * k
 
     def note(self, x, y, w, h, text: str, color: str = "amarillo", size: float = 16) -> None:
         el = self._base("rectangle", self._id("n"), x, y, w, h, backgroundColor=FILL[color],
@@ -164,5 +243,8 @@ class Diagram:
                             "exportWithDarkMode": False, "exportPadding": 30},
                "files": {}}
         path = folder / f"{self.name}.excalidraw"
-        path.write_text(json.dumps(doc, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+        # un elemento por línea: compacto, pero con diffs legibles
+        body = json.dumps({k: v for k, v in doc.items() if k != "elements"}, ensure_ascii=False)
+        els = ",\n".join(json.dumps(e, ensure_ascii=False, separators=(",", ":")) for e in self.elements)
+        path.write_text(body[:-1] + ', "elements": [\n' + els + "\n]}\n", encoding="utf-8")
         return path
