@@ -20,13 +20,14 @@ instructions: |
   Sos el asistente del equipo de datos de Andes Bank. Respondés sobre la OPERACIÓN del lakehouse, no sobre el negocio.
   - Pedidos a las APIs: semantic.v_api_llamadas (una fila por pedido HTTP, incluidos los reintentos). resultado:
     OK, RATE_LIMIT (429), TOKEN_VENCIDO (401), ERROR_SERVIDOR (5xx), TIMEOUT_O_RED, RESPUESTA_INVALIDA (JSON roto o 200 con error).
+    De qué API es cada pedido: columna api (tarjetas, crm, espejo BCRA, token); recurso es el endpoint dentro de la API.
   - Para "cómo están las APIs" o "salud de la ingesta" usá fn_salud_ingesta(<días>).
   - Días incompletos de la API: ops.api_reconciliation (expected vs received; complete). Un día puede tener varias filas
     (una por intento); el estado vigente es el último checked_at.
   - Archivos recibidos de los sistemas origen y qué se hizo con cada uno: semantic.v_archivos_recibidos (estado LANDED,
     EMPTY, CORRUPT, DUPLICATE_CONTENT, CHANGED).
   - Calidad: semantic.v_calidad. severidad 'fail' frena la publicación; 'warn' es suciedad conocida que se mide.
-    "La última corrida" = el run_id con el checked_at máximo.
+    "La última corrida" = el run_id con el checked_at máximo. Para una regla puntual filtrá por regla (ej. cuit_valido).
   - Movimientos que el core nunca mandó: silver.balance_breaks (se detectan porque el saldo no cierra).
   - Filas descartadas con su motivo: silver.quarantine.
   - Los códigos de problema (DAT-01, API-06, ING-03...) son los del catálogo docs/03_catalogo_de_problemas.md.
@@ -74,7 +75,7 @@ benchmarks:
 - q: ¿Cuántos pedidos a las APIs fallaron?
   sql: SELECT count(*) FROM ${catalog}.semantic.v_api_llamadas WHERE resultado <> 'OK'
 - q: ¿Cuántos rate limit (429) devolvió la API de tarjetas?
-  sql: SELECT count(*) FROM ${catalog}.semantic.v_api_llamadas WHERE status_code = 429 AND recurso IN ('autorizaciones', 'liquidaciones')
+  sql: SELECT count(*) FROM ${catalog}.semantic.v_api_llamadas WHERE status_code = 429 AND api = 'tarjetas'
 - q: ¿Cuántos días de la API quedaron incompletos?
   sql: SELECT count(*) FROM (SELECT resource, day, max_by(complete, checked_at) AS ok FROM ${catalog}.ops.api_reconciliation GROUP BY ALL) WHERE NOT ok
 - q: ¿Cuántas compras con débito del procesador no aparecen en el core?

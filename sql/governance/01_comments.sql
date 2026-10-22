@@ -52,7 +52,8 @@ ALTER TABLE ${gold}.fact_autorizacion ALTER COLUMN liquidada COMMENT 'Verdadero 
 
 COMMENT ON TABLE ${gold}.fact_saldo_diario IS 'Saldo de cierre informado por el core: cuentas con movimiento ese día y foto de TODAS las cuentas a fin de mes. Para stock de depósitos usar es_fin_de_mes = true';
 
-COMMENT ON TABLE ${gold}.mart_cliente_360 IS 'Una fila por cliente vigente: productos, saldo total, consumo con tarjetas y actividad de los últimos 90 días';
+COMMENT ON TABLE ${gold}.mart_cliente_360 IS 'Una fila por cliente vigente (estado ACTIVO; los dados de baja no están): productos, saldo total, consumo con tarjetas y actividad de los últimos 90 días. "Cuántos clientes" = count(*) de esta tabla; "cuántas personas" = COUNT(DISTINCT persona_id)';
+ALTER TABLE ${gold}.mart_cliente_360 ALTER COLUMN tipo_persona COMMENT 'HUMANA (persona física) o JURIDICA (empresa, persona jurídica). Los clientes que son empresas: tipo_persona = JURIDICA';
 ALTER TABLE ${gold}.mart_cliente_360 ALTER COLUMN cantidad_productos COMMENT 'Cuentas activas + tarjetas de crédito y débito';
 ALTER TABLE ${gold}.mart_cliente_360 ALTER COLUMN porcentaje_digital_90d COMMENT 'Porcentaje de movimientos de los últimos 90 días hechos por app u homebanking';
 ALTER TABLE ${gold}.mart_cliente_360 ALTER COLUMN cobra_sueldo COMMENT 'Tuvo una acreditación de sueldo en los últimos 90 días';

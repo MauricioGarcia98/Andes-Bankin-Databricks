@@ -81,6 +81,8 @@ Claude Code **acompaña**, no reemplaza:
 
 ## Estado
 
+**MVP terminado** (22-oct-2026): se cumplen los 6 criterios de arriba (Genie entre 80 y 100 % por agent, Azure USD 0,02 en el mes, gate en verde).
+
 Definición **aprobada** (21-oct-2026): volúmenes de [02](02_fuentes_mvp.md), perfil `normal` del
 [catálogo](03_catalogo_de_problemas.md) para el MVP y la App como extra después del MVP
 ([05](05_genie.md#la-app-para-qué-sirve)).

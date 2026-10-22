@@ -28,8 +28,11 @@ WHERE s.es_fin_de_mes;
 
 -- Plataforma de datos: la operación del lakehouse, para que el equipo de datos también le pregunte a Genie
 CREATE OR REPLACE VIEW ${semantic}.v_api_llamadas
-COMMENT 'Cada pedido HTTP a las APIs (procesador de tarjetas, espejo del BCRA) con su resultado, intento y latencia'
+COMMENT 'Cada pedido HTTP a las APIs (procesador de tarjetas, CRM, espejo del BCRA) con su resultado, intento y latencia. api = tarjetas | crm | espejo BCRA | token'
 AS SELECT run_id, called_at, to_date(called_at) AS fecha, method, endpoint,
+          CASE WHEN endpoint LIKE 'crm/%' THEN 'crm'
+               WHEN endpoint LIKE 'fx/%' THEN 'espejo BCRA'
+               WHEN endpoint LIKE '%oauth%' THEN 'token' ELSE 'tarjetas' END AS api,
           CASE WHEN endpoint LIKE '%authorizations%' THEN 'autorizaciones'
                WHEN endpoint LIKE '%settlements%' THEN 'liquidaciones'
                WHEN endpoint LIKE 'fx/%' THEN 'cotizaciones (espejo)'
@@ -47,7 +50,7 @@ AS SELECT run_id, called_at, to_date(called_at) AS fecha, method, endpoint,
 FROM ${ops}.api_calls;
 
 CREATE OR REPLACE VIEW ${semantic}.v_calidad
-COMMENT 'Resultado de cada regla de calidad en cada corrida (ver docs/03 para el catálogo de problemas)'
+COMMENT 'Resultado de cada regla de calidad en cada corrida (ver docs/03 para el catálogo de problemas). Para una regla puntual filtrá por regla (ej. cuit_valido = CUIT inválidos del core), no por texto de la descripción'
 AS SELECT run_id, checked_at, to_date(checked_at) AS fecha, rule AS regla, table_name AS tabla, severity AS severidad,
           catalog_id AS problema, description AS descripcion, failed_rows AS filas_que_fallan, total_rows AS filas_totales,
           passed AS paso, error

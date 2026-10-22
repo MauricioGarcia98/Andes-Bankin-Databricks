@@ -9,6 +9,7 @@ igual que el resto.
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -17,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from excali import MUTED, Diagram, _icons  # noqa: E402
 
 OUT = Path(__file__).resolve().parents[2] / "docs" / "diagramas"
+ROOT_GENIE = Path(__file__).resolve().parents[2] / "genie"
 
 
 # ------------------------------------------------------------------------------------------- 00 panorama
@@ -588,6 +590,37 @@ def operacion() -> Diagram:
     return d
 
 
+# ------------------------------------------------------------------------------------- 17 en números
+def en_numeros() -> Diagram:
+    d = Diagram("17_en_numeros", "Andes Bank en números")
+    d.heading(40, 20, "Un banco argentino simulado, de punta a punta en Databricks Free Edition (números reales del proyecto)")
+    bench = ROOT_GENIE / "benchmarks_dev.json"
+    pct = {}
+    if bench.exists():
+        pct = {k: v["pct"] for k, v in json.loads(bench.read_text(encoding="utf-8")).items()}
+    tarjetas = [
+        ("datos", "17,2 M\nmovimientos (SF 0,1)\n172 M a SF 1", "azul", "database"),
+        ("api", "6.151 pedidos a la API\n163 rate limits, 106 5xx,\n78 tokens vencidos", "violeta", "function"),
+        ("archivos", "8.747 archivos\n1 corrupto, 1 vacío,\n1 duplicado: detectados", "turquesa", "blob"),
+        ("calidad", "22 reglas de calidad\n9 bloqueantes\n22 de 22 en verde", "verde", "settings"),
+        ("costo", "USD 0,02\nde Azure en el mes\n(tope: USD 10)", "amarillo", "azure"),
+        ("tests", "55 tests\nel e2e compara contra\nla verdad del generador", "gris", "python"),
+        ("problemas", "37 problemas\ncatalogados, cada uno\ncon su arreglo", "rojo", "error"),
+        ("bitacora", "18 errores reales\nen la bitácora,\ncon causa y arreglo", "naranja", "document"),
+    ]
+    for i, (k, t, c, ic) in enumerate(tarjetas):
+        x, y = 40 + (i % 4) * 540, 150 + (i // 4) * 260
+        d.box(k, x, y, 500, 220, t, c, 22, icon=ic, icon_size=72)
+    d.zone(40, 700, 2120, 300, "Genie: % de benchmarks que acierta cada agent (objetivo 80 %)", "rosa", icon="genie")
+    nombres = {"01_comercial_clientes": "Comercial", "02_tarjetas_fraude": "Tarjetas y fraude",
+               "03_finanzas_tesoreria": "Finanzas", "04_plataforma_datos": "Plataforma de datos"}
+    for i, (slug, nombre) in enumerate(nombres.items()):
+        v = pct.get(slug)
+        color = "verde" if v is not None and v >= 80 else "rojo"
+        d.box(f"g{i}", 80 + i * 520, 770, 480, 190, f"{nombre}\n{v if v is not None else '-'} %", color, 26, icon="genie", icon_size=72)
+    return d
+
+
 # --------------------------------------------------------------------------------------- 99 catálogo de íconos
 def iconos() -> Diagram:
     d = Diagram("99_iconos", "Íconos disponibles")
@@ -601,7 +634,7 @@ def iconos() -> Diagram:
     return d
 
 
-DIAGRAMS = [panorama, fuentes, ingesta, silver, gold, genie, despliegue, api, linea_de_tiempo, generador, landing, incremental, dia_incompleto, scd2, estrella, piramide_genie, operacion, iconos]
+DIAGRAMS = [panorama, fuentes, ingesta, silver, gold, genie, despliegue, api, linea_de_tiempo, generador, landing, incremental, dia_incompleto, scd2, estrella, piramide_genie, operacion, en_numeros, iconos]
 
 
 def main() -> None:

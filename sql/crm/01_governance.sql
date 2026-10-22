@@ -2,7 +2,7 @@
 -- CRM comercial: comentarios, claves y máscaras. Corre sólo si ya hay CRM en gold (etapa 08).
 -- =============================================================================
 
-COMMENT ON TABLE ${gold}.dim_cuenta_crm IS 'Cuentas del CRM comercial unidas a la persona del core. metodo_match: ID_CORE (por Core_Customer_Id__c), CUIT o SIN_MATCH. Las duplicadas (mismo CUIT) apuntan a cuenta_principal_id: para contar empresas usar COUNT(DISTINCT cuenta_principal_id).';
+COMMENT ON TABLE ${gold}.dim_cuenta_crm IS 'Cuentas del CRM comercial unidas a la persona del core. metodo_match: ID_CORE (por Core_Customer_Id__c), CUIT o SIN_MATCH. Las duplicadas (mismo CUIT) apuntan a cuenta_principal_id: para contar empresas usar COUNT(DISTINCT cuenta_principal_id). Los prospectos (tipo = Prospect) también son empresas cargadas en el CRM.';
 COMMENT ON TABLE ${gold}.fact_oportunidad IS 'Oportunidades comerciales del CRM (desde jun-2024), atribuidas a la cuenta principal y a la persona del core. Pipeline = cerrada = false.';
 COMMENT ON TABLE ${gold}.fact_caso IS 'Casos (reclamos y consultas) del CRM comercial. La descripción viene sin emails ni teléfonos (se reemplazan por [EMAIL] y [TELEFONO]).';
 COMMENT ON TABLE ${gold}.mart_pipeline_comercial IS 'Una fila por persona con actividad en el CRM: pipeline abierto, ganado y casos abiertos.';

@@ -1,0 +1,1306 @@
+{
+ "01_comercial_clientes": {
+  "aciertos": 18,
+  "total": 20,
+  "pct": 90.0,
+  "detalle": [
+   {
+    "q": "¿Cuántas oportunidades abiertas hay en el CRM?",
+    "ok": true,
+    "esperado": [
+     [
+      "170"
+     ]
+    ],
+    "genie": [
+     [
+      "170"
+     ]
+    ],
+    "genie_sql": "SELECT COUNT(*) AS oportunidades_abiertas\nFROM `andes_bank`.`gold`.`fact_oportunidad`\nWHERE `cerrada` = false",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Qué producto tiene más oportunidades ganadas?",
+    "ok": true,
+    "esperado": [
+     [
+      "Préstamo PyME"
+     ]
+    ],
+    "genie": [
+     [
+      "Préstamo PyME",
+      "23"
+     ]
+    ],
+    "genie_sql": "WITH ranked AS (\n  SELECT \n    producto, \n    COUNT(*) AS oportunidades_ganadas,\n    RANK() OVER (ORDER BY COUNT(*) DESC) AS rank\n  FROM andes_bank.gold.fact_oportunidad\n  WHERE ganada = true AND producto IS NOT NULL\n  GROUP BY producto\n)\nSELECT producto, oportunidades_ganadas\nFROM ranked\nWHERE rank = 1",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Cuántos casos abiertos hay en el CRM?",
+    "ok": true,
+    "esperado": [
+     [
+      "78"
+     ]
+    ],
+    "genie": [
+     [
+      "78"
+     ]
+    ],
+    "genie_sql": "SELECT COUNT(*) AS casos_abiertos\nFROM `andes_bank`.`gold`.`fact_caso`\nWHERE cerrado = false",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Cuántas empresas distintas hay cargadas en el CRM?",
+    "ok": true,
+    "esperado": [
+     [
+      "500"
+     ]
+    ],
+    "genie": [
+     [
+      "500"
+     ]
+    ],
+    "genie_sql": "SELECT COUNT(DISTINCT `cuenta_principal_id`) AS empresas_crm\nFROM `andes_bank`.`gold`.`dim_cuenta_crm`",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Cuántos clientes vigentes tenemos?",
+    "ok": true,
+    "esperado": [
+     [
+      "48244"
+     ]
+    ],
+    "genie": [
+     [
+      "48244"
+     ]
+    ],
+    "genie_sql": "SELECT COUNT(*) AS clientes_vigentes FROM `andes_bank`.`gold`.`mart_cliente_360` WHERE `estado` = 'ACTIVO'",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Cuántos clientes activos hay en el segmento PREMIUM?",
+    "ok": true,
+    "esperado": [
+     [
+      "4917"
+     ]
+    ],
+    "genie": [
+     [
+      "4917"
+     ]
+    ],
+    "genie_sql": "SELECT COUNT(*) AS clientes_activos_premium\nFROM `andes_bank`.`gold`.`mart_cliente_360`\nWHERE `estado` = 'ACTIVO' AND `segmento` ILIKE '%PREMIUM%' AND `segmento` IS NOT NULL",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Cuántas personas distintas son clientes?",
+    "ok": true,
+    "esperado": [
+     [
+      "47527"
+     ]
+    ],
+    "genie": [
+     [
+      "47527"
+     ]
+    ],
+    "genie_sql": "SELECT COUNT(DISTINCT `persona_id`) AS `personas_distintas` FROM `andes_bank`.`gold`.`mart_cliente_360` WHERE `persona_id` IS NOT NULL",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Qué región tiene más clientes?",
+    "ok": true,
+    "esperado": [
+     [
+      "CUYO"
+     ]
+    ],
+    "genie": [
+     [
+      "CUYO",
+      "22505"
+     ]
+    ],
+    "genie_sql": "WITH ranked AS (\n  SELECT `region`, COUNT(*) AS clientes,\n    RANK() OVER (ORDER BY COUNT(*) DESC) AS rank\n  FROM `andes_bank`.`gold`.`mart_cliente_360`\n  WHERE `estado` = 'ACTIVO' AND `region` IS NOT NULL\n  GROUP BY `region`\n)\nSELECT `region`, clientes\nFROM ranked\nWHERE rank = 1",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Cuántos clientes tienen tarjeta de crédito?",
+    "ok": true,
+    "esperado": [
+     [
+      "18932"
+     ]
+    ],
+    "genie": [
+     [
+      "18932"
+     ]
+    ],
+    "genie_sql": "SELECT COUNT(*) AS clientes_con_tarjeta_credito\nFROM `andes_bank`.`gold`.`mart_cliente_360`\nWHERE `estado` = 'ACTIVO' AND `tiene_tarjeta_credito` = true AND `tiene_tarjeta_credito` IS NOT NULL",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Qué porcentaje de los clientes tiene caja de ahorro en dólares?",
+    "ok": true,
+    "esperado": [
+     [
+      "40.0"
+     ]
+    ],
+    "genie": [
+     [
+      "40.01948428820164"
+     ]
+    ],
+    "genie_sql": "SELECT try_divide(100.0 * COUNT(*) FILTER (WHERE tiene_caja_usd = true),COUNT(*)) AS porcentaje_caja_usd\nFROM andes_bank.gold.mart_cliente_360\nWHERE estado = 'ACTIVO' AND tiene_caja_usd IS NOT NULL",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Cuántos productos tiene en promedio un cliente PYME?",
+    "ok": true,
+    "esperado": [
+     [
+      "3.45"
+     ]
+    ],
+    "genie": [
+     [
+      "3.45"
+     ]
+    ],
+    "genie_sql": "SELECT round(avg(`cantidad_productos`), 2) AS productos_promedio_pyme\nFROM `andes_bank`.`gold`.`mart_cliente_360`\nWHERE `segmento` = 'PYME' AND `estado` = 'ACTIVO' AND `cantidad_productos` IS NOT NULL",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Cuántos clientes cobran el sueldo en el banco y no tienen tarjeta de crédito?",
+    "ok": true,
+    "esperado": [
+     [
+      "16068"
+     ]
+    ],
+    "genie": [
+     [
+      "16068"
+     ]
+    ],
+    "genie_sql": "SELECT COUNT(*) AS clientes\nFROM `andes_bank`.`gold`.`mart_cliente_360`\nWHERE `estado` = 'ACTIVO' AND `cobra_sueldo` = true AND `tiene_tarjeta_credito` = false",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Qué sucursal física tiene más clientes?",
+    "ok": true,
+    "esperado": [
+     [
+      "San Juan Este"
+     ]
+    ],
+    "genie": [
+     [
+      "San Juan Este",
+      "866"
+     ]
+    ],
+    "genie_sql": "SELECT `sucursal`, COUNT(*) AS `clientes`\nFROM `andes_bank`.`gold`.`mart_cliente_360`\nWHERE `estado` = 'ACTIVO' AND `sucursal_id` <> 999 AND `sucursal` IS NOT NULL\nGROUP BY `sucursal`\nORDER BY `clientes` DESC\nLIMIT 1",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Cuántos clientes son 100% digitales?",
+    "ok": true,
+    "esperado": [
+     [
+      "4832"
+     ]
+    ],
+    "genie": [
+     [
+      "4832"
+     ]
+    ],
+    "genie_sql": "SELECT COUNT(*) AS clientes_digitales\nFROM `andes_bank`.`gold`.`mart_cliente_360`\nWHERE `region` ILIKE '%DIGITAL%' AND `estado` = 'ACTIVO' AND `region` IS NOT NULL",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Cuántos clientes dieron de baja su relación con el banco?",
+    "ok": false,
+    "esperado": [
+     [
+      "0"
+     ]
+    ],
+    "genie": [
+     [
+      "2520"
+     ]
+    ],
+    "genie_sql": "SELECT COUNT(*) AS clientes_baja\nFROM `andes_bank`.`gold`.`dim_cliente`\nWHERE `estado` = 'BAJA' AND `is_current` = true",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Cuántas personas tienen dos números de cliente por la fusión con el banco del NOA?",
+    "ok": true,
+    "esperado": [
+     [
+      "764"
+     ]
+    ],
+    "genie": [
+     [
+      "764"
+     ]
+    ],
+    "genie_sql": "SELECT COUNT(*) AS personas_con_dos_numeros\nFROM (\n  SELECT `persona_id`\n  FROM `andes_bank`.`gold`.`dim_cliente`\n  WHERE `is_current` = true\n  GROUP BY `persona_id`\n  HAVING COUNT(DISTINCT `cliente_id`) > 1\n)",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "Saldo total en pesos de los clientes de la región NOA",
+    "ok": true,
+    "esperado": [
+     [
+      "220653381401"
+     ]
+    ],
+    "genie": [
+     [
+      "NOA",
+      "220653381401"
+     ]
+    ],
+    "genie_sql": "SELECT `Región`, round(MEASURE(`Saldo total (ARS)`), 0) AS saldo_ars\nFROM `andes_bank`.`semantic`.`mv_clientes`\nWHERE `Región` ILIKE '%NOA%'\nGROUP BY ALL",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Cuántos clientes cambiaron de segmento alguna vez?",
+    "ok": false,
+    "esperado": [
+     [
+      "3992"
+     ]
+    ],
+    "genie": [
+     [
+      "1"
+     ],
+     [
+      "1"
+     ],
+     [
+      "1"
+     ],
+     [
+      "1"
+     ],
+     [
+      "1"
+     ]
+    ],
+    "genie_sql": "SELECT COUNT(DISTINCT dim_cliente.cliente_id) AS clientes_con_cambio_segmento\nFROM andes_bank.gold.dim_cliente\nWHERE segmento IS NOT NULL\nGROUP BY dim_cliente.cliente_id\nHAVING COUNT(DISTINCT dim_cliente.segmento) > 1",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "Porcentaje digital promedio de los clientes PREMIUM",
+    "ok": true,
+    "esperado": [
+     [
+      "45.7"
+     ]
+    ],
+    "genie": [
+     [
+      "45.72879804758998"
+     ]
+    ],
+    "genie_sql": "SELECT AVG(porcentaje_digital_90d) AS porcentaje_digital_promedio\nFROM `andes_bank`.`gold`.`mart_cliente_360`\nWHERE segmento = 'PREMIUM' AND estado = 'ACTIVO' AND porcentaje_digital_90d IS NOT NULL",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Cuántos clientes son empresas?",
+    "ok": true,
+    "esperado": [
+     [
+      "3867"
+     ]
+    ],
+    "genie": [
+     [
+      "3867"
+     ]
+    ],
+    "genie_sql": "SELECT COUNT(*) AS clientes_empresas\nFROM `andes_bank`.`gold`.`mart_cliente_360`\nWHERE `tipo_persona` = 'JURIDICA'",
+    "status": "COMPLETED",
+    "error": null
+   }
+  ]
+ },
+ "02_tarjetas_fraude": {
+  "aciertos": 14,
+  "total": 16,
+  "pct": 87.5,
+  "detalle": [
+   {
+    "q": "¿Cuántas autorizaciones de tarjeta hay en total?",
+    "ok": true,
+    "esperado": [
+     [
+      "4463867"
+     ]
+    ],
+    "genie": [
+     [
+      "4463867"
+     ]
+    ],
+    "genie_sql": "SELECT COUNT(*) AS total_autorizaciones FROM `andes_bank`.`gold`.`fact_autorizacion`",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Cuál es la tasa de aprobación general?",
+    "ok": true,
+    "esperado": [
+     [
+      "93.87"
+     ]
+    ],
+    "genie": [
+     [
+      "0.93871"
+     ]
+    ],
+    "genie_sql": "SELECT MEASURE(`Tasa de aprobación`) AS tasa_aprobacion FROM andes_bank.semantic.mv_tarjetas GROUP BY ALL",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Cuántos rechazos por sospecha de fraude hubo en 2025?",
+    "ok": true,
+    "esperado": [
+     [
+      "4986"
+     ]
+    ],
+    "genie": [
+     [
+      "4986"
+     ]
+    ],
+    "genie_sql": "SELECT COUNT(*) AS rechazos_por_sospecha_2025\nFROM `andes_bank`.`gold`.`fact_autorizacion`\nWHERE `rechazo_por_sospecha` = true\n  AND `fecha` >= '2025-01-01' AND `fecha` <= '2025-12-31'\n  AND `fecha` IS NOT NULL",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Qué rubro tuvo más rechazos por sospecha de fraude?",
+    "ok": true,
+    "esperado": [
+     [
+      "Supermercados"
+     ]
+    ],
+    "genie": [
+     [
+      "Supermercados",
+      "4454"
+     ]
+    ],
+    "genie_sql": "WITH rechazos AS (\n  SELECT co.rubro, COUNT(*) AS rechazos,\n    RANK() OVER (ORDER BY COUNT(*) DESC) AS rank\n  FROM andes_bank.gold.fact_autorizacion a\n  JOIN andes_bank.gold.dim_comercio co ON a.comercio_id = co.comercio_id\n  WHERE a.rechazo_por_sospecha = true AND co.rubro IS NOT NULL\n  GROUP BY co.rubro\n)\nSELECT rubro, rechazos FROM rechazos WHERE rank = 1",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Cuánto se consumió con tarjetas (aprobadas) en 2025 en pesos?",
+    "ok": true,
+    "esperado": [
+     [
+      "171722112589"
+     ]
+    ],
+    "genie": [
+     [
+      "171722112589"
+     ]
+    ],
+    "genie_sql": "SELECT round(sum(`importe_ars`), 0) AS consumo_ars\nFROM `andes_bank`.`gold`.`fact_autorizacion`\nWHERE `aprobada` = true\n  AND `fecha` BETWEEN '2025-01-01' AND '2025-12-31'\n  AND `importe_ars` IS NOT NULL",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Qué rubro concentra más consumo aprobado?",
+    "ok": true,
+    "esperado": [
+     [
+      "Aerolíneas"
+     ]
+    ],
+    "genie": [
+     [
+      "Aerolíneas",
+      "90928156639.53"
+     ]
+    ],
+    "genie_sql": "WITH rubro_consumo AS (\n  SELECT co.rubro, SUM(a.importe_ars) AS consumo_aprobado_ars,\n    RANK() OVER (ORDER BY SUM(a.importe_ars) DESC) AS rank\n  FROM `andes_bank`.`gold`.`fact_autorizacion` a\n  JOIN `andes_bank`.`gold`.`dim_comercio` co ON a.comercio_id = co.comercio_id\n  WHERE a.aprobada AND co.rubro IS NOT NULL\n  GROUP BY co.rubro\n)\nSELECT rubro, consumo_aprobado_ars\nFROM rubro_consumo\nWHERE rank = 1;",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Cuántas compras aprobadas fueron en comercios del exterior?",
+    "ok": true,
+    "esperado": [
+     [
+      "180152"
+     ]
+    ],
+    "genie": [
+     [
+      "180152"
+     ]
+    ],
+    "genie_sql": "SELECT count(*) AS compras_aprobadas_exterior\nFROM `andes_bank`.`gold`.`fact_autorizacion` a\nJOIN `andes_bank`.`gold`.`dim_comercio` co ON a.`comercio_id` = co.`comercio_id`\nWHERE a.`aprobada` = true AND co.`es_exterior` = true",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Cuál es el ticket promedio aprobado con tarjeta de crédito en 2026?",
+    "ok": true,
+    "esperado": [
+     [
+      "200193"
+     ]
+    ],
+    "genie": [
+     [
+      "200193.418861"
+     ]
+    ],
+    "genie_sql": "SELECT MEASURE(`Ticket promedio (ARS)`) AS ticket_promedio_aprobado FROM `andes_bank`.`semantic`.`mv_tarjetas` WHERE LOWER(`Tipo de tarjeta`) LIKE '%credito%' AND `Fecha` >= '2026-01-01' AND `Fecha` <= '2026-12-31' GROUP BY ALL",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Cuántos rechazos por fondos insuficientes hubo?",
+    "ok": true,
+    "esperado": [
+     [
+      "110870"
+     ]
+    ],
+    "genie": [
+     [
+      "110870"
+     ]
+    ],
+    "genie_sql": "SELECT COUNT(*) AS rechazos_fondos_insuficientes\nFROM `andes_bank`.`gold`.`fact_autorizacion`\nWHERE `codigo_respuesta` ILIKE '%51_FONDOS_INSUFICIENTES%' AND `codigo_respuesta` IS NOT NULL",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Qué marca de tarjeta tiene más autorizaciones?",
+    "ok": true,
+    "esperado": [
+     [
+      "VISA"
+     ]
+    ],
+    "genie": [
+     [
+      "VISA",
+      "3768625"
+     ]
+    ],
+    "genie_sql": "WITH ranked AS (\n  SELECT `Marca`, MEASURE(`Autorizaciones`) AS autorizaciones,\n    RANK() OVER (ORDER BY MEASURE(`Autorizaciones`) DESC) AS rnk\n  FROM andes_bank.semantic.mv_tarjetas\n  WHERE `Marca` IS NOT NULL\n  GROUP BY ALL\n)\nSELECT `Marca`, autorizaciones\nFROM ranked\nWHERE rnk = 1",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Cuántas tarjetas distintas compraron en 2025?",
+    "ok": true,
+    "esperado": [
+     [
+      "59174"
+     ]
+    ],
+    "genie": [
+     [
+      "59174"
+     ]
+    ],
+    "genie_sql": "SELECT COUNT(DISTINCT `token_tarjeta`) AS tarjetas_distintas\nFROM `andes_bank`.`gold`.`fact_autorizacion`\nWHERE `aprobada` = true\n  AND `fecha` >= '2025-01-01' AND `fecha` <= '2025-12-31'\n  AND `token_tarjeta` IS NOT NULL\n  AND `fecha` IS NOT NULL",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Cuántas autorizaciones aprobadas siguen sin liquidar?",
+    "ok": true,
+    "esperado": [
+     [
+      "76958"
+     ]
+    ],
+    "genie": [
+     [
+      "76958"
+     ]
+    ],
+    "genie_sql": "SELECT count(*) AS autorizaciones_aprobadas_pendientes_liquidar\nFROM `andes_bank`.`gold`.`fact_autorizacion`\nWHERE `aprobada` = true AND `liquidada` = false AND `aprobada` IS NOT NULL AND `liquidada` IS NOT NULL",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Cuántos días tarda en promedio una compra en liquidarse?",
+    "ok": true,
+    "esperado": [
+     [
+      "2.09"
+     ]
+    ],
+    "genie": [
+     [
+      "2.092856033217101"
+     ]
+    ],
+    "genie_sql": "SELECT AVG(`dias_a_liquidar`) AS promedio_dias_liquidacion\nFROM `andes_bank`.`gold`.`fact_autorizacion`\nWHERE `aprobada` = true AND `liquidada` = true AND `dias_a_liquidar` IS NOT NULL",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Qué porcentaje de las compras contactless fue con billetera en 2026?",
+    "ok": false,
+    "esperado": [
+     [
+      "35.0"
+     ]
+    ],
+    "genie": [
+     [
+      "27.94890371147585"
+     ]
+    ],
+    "genie_sql": "SELECT try_divide(100.0 * SUM(CASE WHEN a.billetera IS NOT NULL THEN 1 ELSE 0 END),COUNT(*)) AS porcentaje_billetera_contactless\nFROM `andes_bank`.`gold`.`fact_autorizacion` a\nWHERE a.aprobada = true AND a.modo_ingreso ILIKE '%CONTACTLESS%' AND a.fecha >= '2026-01-01' AND a.fecha < '2027-01-01'",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Cuántas tarjetas tuvieron patrón de fraude en todo 2025?",
+    "ok": false,
+    "esperado": [
+     [
+      "66"
+     ]
+    ],
+    "genie": [
+     [
+      "342ee2f7c867ad673385e243",
+      "CUY-0004334",
+      "2025-10-19",
+      "3",
+      "1",
+      "2",
+      "96781.45",
+      "0"
+     ],
+     [
+      "a890ed8c3bffc0c6b6f57579",
+      "NOA-0010026",
+      "2025-10-18",
+      "10",
+      "8",
+      "2",
+      "40908640.75",
+      "5"
+     ],
+     [
+      "ada8d25aad23c24cd1273bef",
+      "CUY-0014487",
+      "2025-10-24",
+      "3",
+      "3",
+      "0",
+      "788797.66",
+      "0"
+     ],
+     [
+      "50fc8e8c072b48bd8eca8794",
+      "CUY-0037898",
+      "2025-05-13",
+      "11",
+      "7",
+      "5",
+      "41182908.27",
+      "4"
+     ],
+     [
+      "02b63a0fc002433644ee65b7",
+      "CUY-0028869",
+      "2025-06-30",
+      "4",
+      "1",
+      "3",
+      "1034025.38",
+      "2"
+     ]
+    ],
+    "genie_sql": "SELECT * FROM `andes_bank`.`semantic`.`fn_alertas_fraude`(desde => '2025-01-01', hasta => '2025-12-31')",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿En qué hora del día hay más compras aprobadas?",
+    "ok": true,
+    "esperado": [
+     [
+      "19"
+     ]
+    ],
+    "genie": [
+     [
+      "19",
+      "341205"
+     ]
+    ],
+    "genie_sql": "SELECT `Hora`, MEASURE(`Compras aprobadas`) AS compras_aprobadas\nFROM andes_bank.semantic.mv_tarjetas\nWHERE `Hora` IS NOT NULL\nGROUP BY ALL\nORDER BY compras_aprobadas DESC\nLIMIT 1",
+    "status": "COMPLETED",
+    "error": null
+   }
+  ]
+ },
+ "03_finanzas_tesoreria": {
+  "aciertos": 12,
+  "total": 15,
+  "pct": 80.0,
+  "detalle": [
+   {
+    "q": "¿Cuál era el dólar oficial el 31 de diciembre de 2023?",
+    "ok": true,
+    "esperado": [
+     [
+      "808.4500"
+     ]
+    ],
+    "genie": [
+     [
+      "2023-12-31",
+      "808.4500"
+     ]
+    ],
+    "genie_sql": "SELECT `fecha`, `usd_oficial` FROM `andes_bank`.`gold`.`dim_fecha` WHERE `fecha` = '2023-12-31'",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Cuál fue el dólar oficial más alto del período?",
+    "ok": true,
+    "esperado": [
+     [
+      "1525.5000"
+     ]
+    ],
+    "genie": [
+     [
+      "2026-09-25",
+      "1525.5000"
+     ],
+     [
+      "2026-09-26",
+      "1525.5000"
+     ],
+     [
+      "2026-09-27",
+      "1525.5000"
+     ]
+    ],
+    "genie_sql": "WITH ranked AS (\n  SELECT `fecha`, `usd_oficial`, RANK() OVER (ORDER BY `usd_oficial` DESC) AS r\n  FROM `andes_bank`.`gold`.`dim_fecha`\n  WHERE `usd_oficial` IS NOT NULL\n)\nSELECT `fecha`, `usd_oficial`\nFROM ranked\nWHERE r = 1",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Cuántos depósitos en dólares había al 30 de junio de 2025?",
+    "ok": true,
+    "esperado": [
+     [
+      "43662567.61"
+     ]
+    ],
+    "genie": [
+     [
+      "2025-06-30",
+      "18460",
+      "43662567.61",
+      "1205.0000",
+      "52613393970.05"
+     ]
+    ],
+    "genie_sql": "SELECT * FROM `andes_bank`.`semantic`.`fn_posicion_dolares`(al_dia => '2025-06-30')",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Cuál es el stock de depósitos en pesos (todo valuado en pesos) al último fin de mes?",
+    "ok": true,
+    "esperado": [
+     [
+      "706132283737"
+     ]
+    ],
+    "genie": [
+     [
+      "706132283736.83"
+     ]
+    ],
+    "genie_sql": "SELECT SUM(`saldo_ars`) AS `stock_depositos_pesos`\nFROM `andes_bank`.`gold`.`fact_saldo_diario`\nWHERE `es_fin_de_mes` = true AND `fecha` = (SELECT MAX(`fecha`) FROM `andes_bank`.`gold`.`fact_saldo_diario` WHERE `es_fin_de_mes` = true)",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Cuántas cuentas en dólares tenían saldo al último fin de mes?",
+    "ok": true,
+    "esperado": [
+     [
+      "19281"
+     ]
+    ],
+    "genie": [
+     [
+      "2026-09-30",
+      "19281"
+     ]
+    ],
+    "genie_sql": "SELECT fecha, SUM(cuentas) AS cuentas_con_saldo_usd\nFROM andes_bank.gold.mart_tesoreria_mensual\nWHERE moneda = 'USD' AND fecha = (SELECT MAX(fecha) FROM andes_bank.gold.mart_tesoreria_mensual)\nGROUP BY fecha",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Cuánto se acreditó en sueldos en 2025 en pesos?",
+    "ok": true,
+    "esperado": [
+     [
+      "728495029182"
+     ]
+    ],
+    "genie": [
+     [
+      "728495029182.32"
+     ]
+    ],
+    "genie_sql": "SELECT MEASURE(`Créditos (ARS)`) AS total_acreditado_ars\nFROM andes_bank.semantic.mv_movimientos\nWHERE `Concepto` = 'ACREDITACION_SUELDO' AND `Mes` ILIKE '%2025%'\nGROUP BY ALL",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Cuánto se invirtió en plazos fijos en 2025?",
+    "ok": false,
+    "esperado": [
+     [
+      "738436272727"
+     ]
+    ],
+    "genie": [
+     [
+      null
+     ]
+    ],
+    "genie_sql": "SELECT round(SUM(`saldo_ars`), 0) AS total_invertido_ars FROM `andes_bank`.`gold`.`mart_tesoreria_mensual` WHERE `tipo_cuenta` ILIKE '%PLAZO FIJO%' AND `fecha` >= '2025-01-01' AND `fecha` < '2026-01-01' AND `saldo_ars` IS NOT NULL",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Qué segmento tiene más depósitos en pesos al último fin de mes?",
+    "ok": false,
+    "esperado": [
+     [
+      "PYME"
+     ]
+    ],
+    "genie": [],
+    "genie_sql": "SELECT `Segmento`, MEASURE(`Depósitos (ARS)`) AS `depositos_ars`, RANK() OVER (ORDER BY `Fecha` DESC) AS fecha_rnk, RANK() OVER (ORDER BY MEASURE(`Depósitos (ARS)`) DESC) AS dep_rnk FROM `andes_bank`.`semantic`.`mv_depositos` WHERE `Moneda` = 'ARS' GROUP BY ALL QUALIFY fecha_rnk = 1 AND dep_rnk = 1",
+    "status": "FAILED",
+    "error": {
+     "error": "[MISSING_AGGREGATION] The non-aggregating expression \"Fecha\" is based on columns which are not participating in the GROUP BY clause.\nAdd the columns or the expression to the GROUP BY, aggregate the expression, or use \"any_value(Fecha)\" if you do not care which of the values within a group is returned. SQLSTATE: 42803",
+     "type": "SQL_EXECUTION_EXCEPTION"
+    }
+   },
+   {
+    "q": "¿Cuántos movimientos hubo en 2025?",
+    "ok": true,
+    "esperado": [
+     [
+      "4572411"
+     ]
+    ],
+    "genie": [
+     [
+      "4572411"
+     ]
+    ],
+    "genie_sql": "SELECT MEASURE(`Movimientos`) AS movimientos_2025\nFROM andes_bank.semantic.mv_movimientos\nWHERE `Fecha` >= '2025-01-01' AND `Fecha` < '2026-01-01'\nGROUP BY ALL",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Cuál fue el flujo neto en pesos de 2024?",
+    "ok": true,
+    "esperado": [
+     [
+      "155658606269"
+     ]
+    ],
+    "genie": [
+     [
+      "155658606268.81"
+     ]
+    ],
+    "genie_sql": "SELECT MEASURE(`Flujo neto (ARS)`) AS flujo_neto_ars\nFROM andes_bank.semantic.mv_movimientos\nWHERE `Fecha` >= '2024-01-01' AND `Fecha` <= '2024-12-31'\nGROUP BY ALL",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Cuánto se pagó de resúmenes de tarjeta de crédito en 2025?",
+    "ok": true,
+    "esperado": [
+     [
+      "57952891568"
+     ]
+    ],
+    "genie": [
+     [
+      "57952891568"
+     ]
+    ],
+    "genie_sql": "SELECT round(MEASURE(`Débitos (ARS)`), 0) AS total_pagado_tarjeta_2025 FROM andes_bank.semantic.mv_movimientos WHERE `Concepto` LIKE '%TARJETA%' AND `Fecha` >= '2025-01-01' AND `Fecha` <= '2025-12-31' GROUP BY ALL",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Qué porcentaje de los movimientos de 2026 fue por canales digitales?",
+    "ok": true,
+    "esperado": [
+     [
+      "42.0"
+     ]
+    ],
+    "genie": [
+     [
+      "0.42035"
+     ]
+    ],
+    "genie_sql": "SELECT MEASURE(`Movimientos digitales (%)`) AS porcentaje_digital\nFROM andes_bank.semantic.mv_movimientos\nWHERE `Año` = 2026\nGROUP BY ALL",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Cuántos días hábiles no tuvieron cotización publicada?",
+    "ok": true,
+    "esperado": [
+     [
+      "9"
+     ]
+    ],
+    "genie": [
+     [
+      "9"
+     ]
+    ],
+    "genie_sql": "SELECT COUNT(*) AS dias_habiles_sin_cotizacion\nFROM `andes_bank`.`gold`.`dim_fecha`\nWHERE `es_dia_habil` = true AND `cotizacion_publicada` = false",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Cuántas veces subió el dólar oficial entre el 1 y el 31 de diciembre de 2023 (cociente)?",
+    "ok": false,
+    "esperado": [
+     [
+      "2.24"
+     ]
+    ],
+    "genie": [
+     [
+      "17"
+     ]
+    ],
+    "genie_sql": "SELECT COUNT(*) AS subidas\nFROM (\n  SELECT `fecha`, `usd_oficial`, LAG(`usd_oficial`) OVER (ORDER BY `fecha`) AS prev_usd_oficial\n  FROM `andes_bank`.`gold`.`dim_fecha`\n  WHERE `fecha` BETWEEN '2023-12-01' AND '2023-12-31'\n) t\nWHERE `usd_oficial` IS NOT NULL AND prev_usd_oficial IS NOT NULL AND `usd_oficial` > prev_usd_oficial",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "Depósitos en dólares a fin de cada mes de 2025 (moneda original)",
+    "ok": true,
+    "esperado": [
+     [
+      "2025-01",
+      "51654752"
+     ],
+     [
+      "2025-02",
+      "50153439"
+     ],
+     [
+      "2025-03",
+      "48481831"
+     ],
+     [
+      "2025-04",
+      "46841688"
+     ],
+     [
+      "2025-05",
+      "45217557"
+     ]
+    ],
+    "genie": [
+     [
+      "2025-01",
+      "51654752"
+     ],
+     [
+      "2025-02",
+      "50153439"
+     ],
+     [
+      "2025-03",
+      "48481831"
+     ],
+     [
+      "2025-04",
+      "46841688"
+     ],
+     [
+      "2025-05",
+      "45217557"
+     ]
+    ],
+    "genie_sql": "SELECT mart_tesoreria_mensual.anio_mes, ROUND(SUM(mart_tesoreria_mensual.saldo_moneda_original), 0) AS depositos_usd_original\nFROM andes_bank.gold.mart_tesoreria_mensual\nWHERE mart_tesoreria_mensual.moneda = 'USD' AND mart_tesoreria_mensual.anio_mes BETWEEN '2025-01' AND '2025-12' AND mart_tesoreria_mensual.saldo_moneda_original IS NOT NULL\nGROUP BY mart_tesoreria_mensual.anio_mes\nORDER BY mart_tesoreria_mensual.anio_mes ASC",
+    "status": "COMPLETED",
+    "error": null
+   }
+  ]
+ },
+ "04_plataforma_datos": {
+  "aciertos": 15,
+  "total": 15,
+  "pct": 100.0,
+  "detalle": [
+   {
+    "q": "¿Cuántos archivos llegaron de los sistemas origen?",
+    "ok": true,
+    "esperado": [
+     [
+      "8747"
+     ]
+    ],
+    "genie": [
+     [
+      "8747"
+     ]
+    ],
+    "genie_sql": "SELECT COUNT(*) AS archivos_recibidos FROM andes_bank.semantic.v_archivos_recibidos WHERE archivo IS NOT NULL AND fecha_entrega IS NOT NULL;",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Qué archivo llegó corrupto?",
+    "ok": true,
+    "esperado": [
+     [
+      "movimientos/2025/11/03/MOVIMIENTOS_20251103.csv.gz"
+     ]
+    ],
+    "genie": [
+     [
+      "core",
+      "movimientos/2025/11/03/MOVIMIENTOS_20251103.csv.gz",
+      "CORRUPT",
+      "EOFError: Compressed file ended before the end-of-stream marker was reached"
+     ]
+    ],
+    "genie_sql": "SELECT `sistema`, `archivo`, `estado`, `detalle` FROM `andes_bank`.`semantic`.`v_archivos_recibidos` WHERE `estado` ILIKE 'CORRUPT' ORDER BY `fecha_entrega` ASC;",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Qué archivo se rechazó por tener el mismo contenido que otro?",
+    "ok": true,
+    "esperado": [
+     [
+      "movimientos/2026/02/10/MOVIMIENTOS_20260210_copia.csv.gz"
+     ]
+    ],
+    "genie": [
+     [
+      "core",
+      "movimientos/2026/02/10/MOVIMIENTOS_20260210_copia.csv.gz",
+      "DUPLICATE_CONTENT",
+      "mismo contenido que core/movimientos/2026/02/10/MOVIMIENTOS_20260210.csv.gz"
+     ]
+    ],
+    "genie_sql": "SELECT `sistema`, `archivo`, `estado`, `detalle` FROM `andes_bank`.`semantic`.`v_archivos_recibidos` WHERE `estado` ILIKE 'DUPLICATE_CONTENT' ORDER BY `fecha_entrega` ASC",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Cuántas filas de datos aterrizaron en total?",
+    "ok": true,
+    "esperado": [
+     [
+      "40993473"
+     ]
+    ],
+    "genie": [
+     [
+      "40993473"
+     ]
+    ],
+    "genie_sql": "SELECT SUM(`filas`) AS total_filas_aterrizadas FROM `andes_bank`.`semantic`.`v_archivos_recibidos` WHERE `estado` = 'LANDED' AND `filas` IS NOT NULL",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Cuántas reglas de calidad se evaluaron en la última corrida?",
+    "ok": true,
+    "esperado": [
+     [
+      "22"
+     ]
+    ],
+    "genie": [
+     [
+      "22"
+     ]
+    ],
+    "genie_sql": "SELECT COUNT(DISTINCT `regla`) AS `reglas_evaluadas`\nFROM `andes_bank`.`semantic`.`v_calidad`\nWHERE `run_id` = (SELECT max_by(`run_id`, `checked_at`) FROM `andes_bank`.`semantic`.`v_calidad`)",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Falló alguna regla bloqueante en la última corrida?",
+    "ok": true,
+    "esperado": [
+     [
+      "0"
+     ]
+    ],
+    "genie": [
+     [
+      "hora_en_utc",
+      "DAT-06",
+      "0",
+      "17234022",
+      "true"
+     ],
+     [
+      "observaciones_sin_pii",
+      "DAT-11",
+      "0",
+      "60352",
+      "true"
+     ],
+     [
+      "movimiento_unico",
+      "DAT-01",
+      "0",
+      "17234022",
+      "true"
+     ],
+     [
+      "dias_api_completos",
+      "API-06",
+      "0",
+      "1136",
+      "true"
+     ],
+     [
+      "autorizacion_unica",
+      "API-05",
+      "0",
+      "4463867",
+      "true"
+     ]
+    ],
+    "genie_sql": "SELECT `regla`, `problema`, `filas_que_fallan`, `filas_totales`, `paso` FROM `andes_bank`.`semantic`.`v_calidad` WHERE `run_id` = (SELECT max_by(`run_id`, `checked_at`) FROM `andes_bank`.`semantic`.`v_calidad`) AND `severidad` = 'fail' ORDER BY `paso`",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Cuántos CUIT inválidos detectó la última corrida?",
+    "ok": true,
+    "esperado": [
+     [
+      "244"
+     ]
+    ],
+    "genie": [
+     [
+      "244"
+     ]
+    ],
+    "genie_sql": "SELECT `filas_que_fallan` FROM `andes_bank`.`semantic`.`v_calidad` WHERE `regla` = 'cuit_valido' AND `run_id` = (SELECT max_by(`run_id`, `checked_at`) FROM `andes_bank`.`semantic`.`v_calidad`)",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Cuántos movimientos faltantes se detectaron por saldo?",
+    "ok": true,
+    "esperado": [
+     [
+      "3380"
+     ]
+    ],
+    "genie": [
+     [
+      "3380"
+     ]
+    ],
+    "genie_sql": "SELECT COUNT(*) AS movimientos_faltantes FROM `andes_bank`.`silver`.`balance_breaks`",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Cuántas filas hay en cuarentena?",
+    "ok": true,
+    "esperado": [
+     [
+      "0"
+     ]
+    ],
+    "genie": [
+     [
+      "0"
+     ]
+    ],
+    "genie_sql": "SELECT COUNT(*) AS filas_en_cuarentena FROM `andes_bank`.`silver`.`quarantine`",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Cuántos pedidos se hicieron a las APIs en total?",
+    "ok": true,
+    "esperado": [
+     [
+      "6151"
+     ]
+    ],
+    "genie": [
+     [
+      "6151"
+     ]
+    ],
+    "genie_sql": "SELECT COUNT(*) AS total_pedidos FROM `andes_bank`.`semantic`.`v_api_llamadas`",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Cuántos pedidos a las APIs fallaron?",
+    "ok": true,
+    "esperado": [
+     [
+      "374"
+     ]
+    ],
+    "genie": [
+     [
+      "374"
+     ]
+    ],
+    "genie_sql": "SELECT COUNT(*) AS pedidos_fallidos FROM `andes_bank`.`semantic`.`v_api_llamadas` WHERE `resultado` ILIKE '%' AND `resultado` != 'OK'",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Cuántos rate limit (429) devolvió la API de tarjetas?",
+    "ok": true,
+    "esperado": [
+     [
+      "163"
+     ]
+    ],
+    "genie": [
+     [
+      "163"
+     ]
+    ],
+    "genie_sql": "SELECT count(*) AS rate_limit_count FROM `andes_bank`.`semantic`.`v_api_llamadas` WHERE `api` ILIKE '%tarjetas%' AND `resultado` ILIKE '%RATE_LIMIT%' AND `api` IS NOT NULL AND `resultado` IS NOT NULL;",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Cuántos días de la API quedaron incompletos?",
+    "ok": true,
+    "esperado": [
+     [
+      "0"
+     ]
+    ],
+    "genie": [
+     [
+      "0"
+     ]
+    ],
+    "genie_sql": "WITH ultimos AS (\n  SELECT `day`, `complete`, ROW_NUMBER() OVER (PARTITION BY `day` ORDER BY `checked_at` DESC) AS rn\n  FROM `andes_bank`.`ops`.`api_reconciliation`\n  WHERE `day` IS NOT NULL AND `checked_at` IS NOT NULL\n)\nSELECT COUNT(*) AS dias_incompletos\nFROM ultimos\nWHERE rn = 1 AND `complete` = false",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Cuántas compras con débito del procesador no aparecen en el core?",
+    "ok": true,
+    "esperado": [
+     [
+      "575"
+     ]
+    ],
+    "genie": [
+     [
+      "575"
+     ]
+    ],
+    "genie_sql": "SELECT SUM(`solo_en_procesador`) AS compras_no_en_core FROM `andes_bank`.`gold`.`mart_conciliacion_tarjetas` WHERE `solo_en_procesador` IS NOT NULL",
+    "status": "COMPLETED",
+    "error": null
+   },
+   {
+    "q": "¿Qué problema del catálogo tiene más filas afectadas en la última corrida?",
+    "ok": true,
+    "esperado": [
+     [
+      "DAT-10"
+     ]
+    ],
+    "genie": [
+     [
+      "DAT-10",
+      "3380"
+     ]
+    ],
+    "genie_sql": "WITH ranked AS (\n  SELECT `problema`, `filas_que_fallan`, RANK() OVER (ORDER BY `filas_que_fallan` DESC) AS rank\n  FROM `andes_bank`.`semantic`.`v_calidad`\n  WHERE `run_id` = (SELECT max_by(`run_id`, `checked_at`) FROM `andes_bank`.`semantic`.`v_calidad`)\n  AND `filas_que_fallan` IS NOT NULL\n)\nSELECT `problema`, `filas_que_fallan`\nFROM ranked\nWHERE rank = 1",
+    "status": "COMPLETED",
+    "error": null
+   }
+  ]
+ }
+}

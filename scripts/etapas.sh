@@ -31,6 +31,8 @@ declare -A ETAPAS=(
   [19]="genie scripts/build_genie.py scripts/deploy_genie.py scripts/validate_genie_sql.py scripts/genie_benchmark.py"
   [21]=".assistant_instructions.md .assistant"
   [22]=".github/workflows"
+  [23]="docs/operacion.md scripts/azure/04_costo.sh"
+  [24]="docs/07_posteo_linkedin.md"
 )
 
 for n in $(printf '%s\n' "${!ETAPAS[@]}" | sort); do

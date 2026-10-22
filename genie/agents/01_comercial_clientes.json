@@ -89,7 +89,9 @@
             "  cuentas del CRM en gold.dim_cuenta_crm. Se unen al core por persona_id. \"Pipeline\" = oportunidades abiertas\n",
             "  (cerrada = false); \"ganado\" = ganada = true. Las cuentas duplicadas del CRM ya están unificadas en cuenta_principal_id:\n",
             "  contá empresas con COUNT(DISTINCT cuenta_principal_id), nunca contando filas de dim_cuenta_crm.\n",
-            "- metodo_match dice cómo se unió la cuenta del CRM al core (ID_CORE, CUIT o SIN_MATCH). Los prospectos no son clientes."
+            "- metodo_match dice cómo se unió la cuenta del CRM al core (ID_CORE, CUIT o SIN_MATCH). Los prospectos no son clientes,\n",
+            "  pero SÍ son empresas cargadas en el CRM: \"empresas en el CRM\" los incluye.\n",
+            "- \"Clientes que son empresas\" sale del core, no del CRM: gold.mart_cliente_360 con tipo_persona = 'JURIDICA'."
           ]
         }
       ],

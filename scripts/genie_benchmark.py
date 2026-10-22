@@ -5,7 +5,8 @@ del SQL esperado, corrido en el warehouse. Criterio del MVP: al menos 80 % por a
     python scripts/genie_benchmark.py --only 02_tarjetas_fraude --limit 3
 
 Una respuesta de Genie ACIERTA si cada valor del resultado esperado aparece en el resultado de Genie: los números con
-una tolerancia de 0,5 % (y también si uno es el otro × 100, por los porcentajes), los textos sin importar mayúsculas.
+una tolerancia de 0,5 % (y también si uno es el otro × 100, por los porcentajes), los textos sin importar mayúsculas, y
+en las preguntas de sí/no un 0 esperado equivale a "No" (y más de 0, a "Sí").
 Genie puede devolver columnas o filas de más (por ejemplo, el nombre al lado del número): eso no lo penaliza.
 El detalle de cada pregunta queda en genie/benchmarks_<target>.json.
 """
@@ -35,8 +36,14 @@ def _num(v):
         return None
 
 
+YES, NO = {"sí", "si", "true", "yes"}, {"no", "false", "ninguna", "ninguno"}
+
+
 def _same(expected, got) -> bool:
     a, b = _num(expected), _num(got)
+    g = str(got).strip().lower()
+    if a is not None and b is None and g in YES | NO:     # "¿falló alguna?": 0 es "No", más de 0 es "Sí"
+        return (a == 0) == (g in NO)
     if a is not None and b is not None:
         return any(abs(a - x) <= max(0.01, abs(a) * 0.005) for x in (b, b * 100, b / 100))
     return str(expected).strip().lower() == str(got).strip().lower()

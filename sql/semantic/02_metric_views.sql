@@ -24,6 +24,7 @@ dimensions:
     expr: sucursal
   - name: Tipo de persona
     expr: tipo_persona
+    synonyms: [empresa o persona, persona jurídica, persona física, empresas]
   - name: Banco de origen
     expr: banco_origen
   - name: Rango de edad
