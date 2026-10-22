@@ -64,12 +64,14 @@ def lake(spark, tmp_path_factory):
             resource, y, m, d, _ = u.name.split("/")
             pages.setdefault((resource, f"{y}-{m}-{d}"), []).extend(json.loads(u.data))
     fx = _fx_series()
+    now = [0.0]  # reloj simulado: la espera entre rondas de reintento lo adelanta (R14)
     api = CardApi(MemoryStore(pages), MemoryFxStore({"USD": fx}), Settings("c", "s", "k"),
-                  Chaos("normal", seed=9, rng=random.Random(2)), sleep=lambda s: None)
+                  Chaos("normal", seed=9, rng=random.Random(2), clock=lambda: now[0]), sleep=lambda s: None)
     client = ApiClient("http://fake/api", "c", "s", run_id="e2e", session=FakeSession(api), sleep=lambda s: None,
                        rng=random.Random(4))
     for resource in ("authorizations", "settlements"):
-        assert bronze_api.ingest_cards_api(spark, cfg, client, resource, batch_days=200)["incomplete_days"] == []
+        assert bronze_api.ingest_cards_api(spark, cfg, client, resource, batch_days=200,
+                                           sleep=lambda s: now.__setitem__(0, now[0] + s))["incomplete_days"] == []
     bronze_api.ingest_fx(spark, cfg, bronze_api.mirror_page_getter(client), ("USD",), "mirror", "e2e")
     bronze_api.flush_calls(spark, cfg, client)
     silver = load_all(spark, cfg)

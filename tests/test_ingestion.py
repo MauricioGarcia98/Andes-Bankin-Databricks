@@ -25,9 +25,10 @@ def _client(api, **kw):
                      sleep=lambda s: None, rng=random.Random(3), **kw)
 
 
-def _api(data, profile):
+def _api(data, profile, clock=lambda: 0.0):
+    # reloj fijo: las fallas estructurales dependen de la ventana de 10 minutos (con el reloj real, el test es azaroso)
     return CardApi(MemoryStore(data), MemoryFxStore({}), SETTINGS,
-                   Chaos(profile, seed=5, rng=random.Random(11)), sleep=lambda s: None)
+                   Chaos(profile, seed=5, rng=random.Random(11), clock=clock), sleep=lambda s: None)
 
 
 def _rows(day, n):
@@ -37,10 +38,14 @@ def _rows(day, n):
 @pytest.mark.parametrize("profile", ["off", "normal", "dificil"])
 def test_cliente_recupera_dias_completos_con_caos(profile):
     days = [f"2025-07-{d:02d}" for d in range(1, 11)]
-    api = _api({("authorizations", d): _rows(d, 2_345) for d in days}, profile)
+    now = [0.0]
+    api = _api({("authorizations", d): _rows(d, 2_345) for d in days}, profile, clock=lambda: now[0])
     client = _client(api)
     for d in days:
         r = client.fetch_day("authorizations", d, "auth_id", "processing_date")
+        if not r.complete:          # página salteada estable en esta ventana (R14): un rato después se recupera
+            now[0] += 600
+            r = client.fetch_day("authorizations", d, "auth_id", "processing_date")
         assert r.complete, (profile, d, len(r.records), r.expected)
     statuses = {c["status_code"] for c in client.calls}
     if profile != "off":
@@ -115,3 +120,22 @@ def test_bronze_de_la_api_con_watermark(spark, truth):
     assert spark.table(cfg.table("ops", "api_calls")).count() > 0
     # re-correr no trae nada (watermark) y re-ingestar un día no duplica (replaceWhere)
     assert bronze_api.ingest_cards_api(spark, cfg, client, "authorizations", until=date(2025, 7, 7))["days"] == 0
+
+
+def test_dia_incompleto_se_reintenta_al_final_de_la_corrida(spark, truth):
+    """R14: la página salteada es estable un rato; los reintentos inmediatos no alcanzan, los diferidos sí."""
+    cfg, _ = truth
+    days = ["2025-07-08", "2025-07-09", "2025-07-10"]
+    api = _api({("authorizations", d): _rows(d, 2_500) for d in days}, "off")
+    api.chaos.profile = api.chaos.profile.__class__(skipped_page=1.0)   # durante "esta ventana", siempre saltea
+    waits = []
+
+    def sleep(s):                                                       # "un rato después" la API ya no saltea
+        waits.append(s)
+        api.chaos.profile = api.chaos.profile.__class__()
+
+    s = bronze_api.ingest_cards_api(spark, cfg, _client(api), "authorizations", until=date(2025, 7, 10), sleep=sleep)
+    assert s["incomplete_days"] == [] and s["retry_rounds"] == 1 and len(waits) == 1
+    assert bronze_api.watermark(spark, cfg, "authorizations") == date(2025, 7, 10)
+    b = spark.table(cfg.table("bronze", "cards_api_authorizations")).where(F.col("_window_date").isin(days))
+    assert b.count() == 7_500

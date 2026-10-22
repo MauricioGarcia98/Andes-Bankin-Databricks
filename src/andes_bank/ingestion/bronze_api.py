@@ -11,6 +11,7 @@ día incompleto no avanza el watermark: la próxima corrida lo vuelve a pedir.
 from __future__ import annotations
 
 import json
+import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timedelta, timezone
 
@@ -94,15 +95,21 @@ def write_day_batch(spark: SparkSession, cfg: ProjectConfig, resource: str, resu
 
 def ingest_cards_api(spark: SparkSession, cfg: ProjectConfig, client: ApiClient, resource: str,
                      until: date | None = None, max_days: int | None = None, parallel_days: int = 4,
-                     batch_days: int = 30) -> dict:
-    """Ingesta incremental por día desde el watermark. Devuelve un resumen de la corrida."""
+                     batch_days: int = 30, retry_rounds: int = 3, retry_wait_s: float = 240,
+                     sleep=time.sleep) -> dict:
+    """Ingesta incremental por día desde el watermark. Devuelve un resumen de la corrida.
+
+    Un día que no cierra contra los totales NO frena la corrida: se sigue con los demás y al final se lo vuelve a
+    pedir, esperando entre rondas. La página salteada (API-06) es estable durante un rato del lado de la API, así que
+    re-pedirla enseguida da lo mismo (bitácora R14); un rato después, no.
+    """
     _, id_field, date_param = RESOURCES[resource]
     days = days_to_fetch(spark, cfg, resource, until, max_days)
-    summary = {"resource": resource, "days": len(days), "rows": 0, "incomplete_days": []}
+    summary = {"resource": resource, "days": len(days), "rows": 0, "retry_rounds": 0, "incomplete_days": []}
     recon_table = cfg.table("ops", "api_reconciliation")
     _ensure(spark, recon_table, RECON_SCHEMA)
-    for i in range(0, len(days), batch_days):
-        batch = days[i: i + batch_days]
+
+    def fetch_and_write(batch: list[date]) -> list[date]:
         with ThreadPoolExecutor(max_workers=parallel_days) as pool:
             results = list(pool.map(lambda d: client.fetch_day(resource, d.isoformat(), id_field, date_param), batch))
         now = datetime.now(timezone.utc)
@@ -111,17 +118,25 @@ def ingest_cards_api(spark: SparkSession, cfg: ProjectConfig, client: ApiClient,
             .write.mode("append").saveAsTable(recon_table)
         summary["rows"] += write_day_batch(spark, cfg, resource, results, client.run_id)
         flush_calls(spark, cfg, client)
-        # el watermark avanza hasta el último día completo SIN huecos antes
-        complete_prefix = None
-        for r in results:
-            if not r.complete:
-                summary["incomplete_days"].append(r.day)
-                break
-            complete_prefix = date.fromisoformat(r.day)
-        if complete_prefix:
-            _set_watermark(spark, cfg, resource, complete_prefix)
-        if summary["incomplete_days"]:
+        return [date.fromisoformat(r.day) for r in results if not r.complete]
+
+    incomplete: list[date] = []
+    for i in range(0, len(days), batch_days):
+        incomplete += fetch_and_write(days[i: i + batch_days])
+    while incomplete and summary["retry_rounds"] < retry_rounds:
+        summary["retry_rounds"] += 1
+        sleep(retry_wait_s)
+        incomplete = fetch_and_write(incomplete)
+
+    # el watermark avanza hasta el último día completo SIN huecos antes; lo que sigue se vuelve a pedir la próxima vez
+    complete_prefix = None
+    for d in days:
+        if d in incomplete:
             break
+        complete_prefix = d
+    if complete_prefix:
+        _set_watermark(spark, cfg, resource, complete_prefix)
+    summary["incomplete_days"] = [d.isoformat() for d in incomplete]
     return summary
 
 
