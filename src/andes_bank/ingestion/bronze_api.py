@@ -105,13 +105,22 @@ def ingest_cards_api(spark: SparkSession, cfg: ProjectConfig, client: ApiClient,
     """
     _, id_field, date_param = RESOURCES[resource]
     days = days_to_fetch(spark, cfg, resource, until, max_days)
-    summary = {"resource": resource, "days": len(days), "rows": 0, "retry_rounds": 0, "incomplete_days": []}
+    summary = {"resource": resource, "days": len(days), "rows": 0, "retry_rounds": 0, "incomplete_days": [],
+               "not_ready_days": []}
     recon_table = cfg.table("ops", "api_reconciliation")
     _ensure(spark, recon_table, RECON_SCHEMA)
+
+    not_ready: list[date] = []
 
     def fetch_and_write(batch: list[date]) -> list[date]:
         with ThreadPoolExecutor(max_workers=parallel_days) as pool:
             results = list(pool.map(lambda d: client.fetch_day(resource, d.isoformat(), id_field, date_param), batch))
+        # un día que el proveedor todavía no publicó no se concilia ni se escribe: se pide en la próxima corrida
+        not_ready.extend(date.fromisoformat(r.day) for r in results if not r.ready)
+        results = [r for r in results if r.ready]
+        if not results:
+            flush_calls(spark, cfg, client)
+            return []
         now = datetime.now(timezone.utc)
         spark.createDataFrame([(client.run_id, resource, date.fromisoformat(r.day), r.expected, len(r.records), r.passes,
                                 r.pages_read, r.duplicates_seen, r.complete, now) for r in results], RECON_SCHEMA) \
@@ -131,12 +140,13 @@ def ingest_cards_api(spark: SparkSession, cfg: ProjectConfig, client: ApiClient,
     # el watermark avanza hasta el último día completo SIN huecos antes; lo que sigue se vuelve a pedir la próxima vez
     complete_prefix = None
     for d in days:
-        if d in incomplete:
+        if d in incomplete or d in not_ready:
             break
         complete_prefix = d
     if complete_prefix:
         _set_watermark(spark, cfg, resource, complete_prefix)
     summary["incomplete_days"] = [d.isoformat() for d in incomplete]
+    summary["not_ready_days"] = [d.isoformat() for d in sorted(not_ready)]
     return summary
 
 

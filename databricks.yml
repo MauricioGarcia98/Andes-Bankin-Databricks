@@ -25,6 +25,7 @@ variables:
   start_date:
     default: "2023-01-01"
   end_date:
+    description: "Fin de la historia que genera andes_fuentes (después, andes_dia agrega un día por día)"
     default: "2026-10-20"
   warehouse_id:
     description: SQL warehouse para dashboards, metric views y Genie

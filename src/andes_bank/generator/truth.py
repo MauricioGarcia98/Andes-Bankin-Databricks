@@ -10,6 +10,7 @@ el CRM. `sim` sirve para los tests y para medir si el pipeline recuperó la verd
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 
 from pyspark.sql import SparkSession
 
@@ -40,4 +41,11 @@ def generate_truth(spark: SparkSession, cfg: ProjectConfig) -> dict[str, int]:
     _save(events.settlements_df(t("authorizations"), t("months"), cfg), cfg, "settlements")
     _save(events.transactions_df(t("customers"), t("accounts"), t("authorizations"), t("months"), cfg), cfg, "transactions")
     _save(events.balances_df(t("transactions"), t("accounts"), cfg), cfg, "balances")
-    return {name: t(name).count() for name in TRUTH_TABLES}
+    counts = {name: t(name).count() for name in TRUTH_TABLES}
+    # el último día de la historia: desde acá sigue el job "día nuevo" (generator/daily.py)
+    from andes_bank.generator.daily import GENERATED_DAYS_DDL
+
+    row = (cfg.end_date, datetime.now(timezone.utc), counts["authorizations"], counts["settlements"],
+           counts["transactions"], counts["balances"])
+    _save(spark.createDataFrame([row], GENERATED_DAYS_DDL), cfg, "generated_days")
+    return counts

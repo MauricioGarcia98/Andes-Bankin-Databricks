@@ -146,8 +146,11 @@ def monthly_index_rows(start: date, end: date) -> list[tuple[str, float, float]]
         for m in range(1, 13):
             if (year, m) < (start.year, start.month) or (year, m) > (end.year, end.month):
                 continue
-            rows.append((f"{year}-{m:02d}", round(idx, 6), float(USD_OFFICIAL_EOM[year][m - 1])))
-            idx *= 1 + MONTHLY_INFLATION[year][m - 1] / 100
+            # después de 2026 (el banco sigue vivo con el job "día nuevo") se repite el último año conocido
+            infl = MONTHLY_INFLATION.get(year, MONTHLY_INFLATION[max(MONTHLY_INFLATION)])
+            usd = USD_OFFICIAL_EOM.get(year, [USD_OFFICIAL_EOM[max(USD_OFFICIAL_EOM)][-1]] * 12)
+            rows.append((f"{year}-{m:02d}", round(idx, 6), float(usd[m - 1])))
+            idx *= 1 + infl[m - 1] / 100
     return rows
 
 

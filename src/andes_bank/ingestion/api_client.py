@@ -37,10 +37,11 @@ class DayResult:
     passes: int
     pages_read: int
     duplicates_seen: int
+    ready: bool = True       # False: el proveedor todavía no publicó el día (totales en 0)
 
     @property
     def complete(self) -> bool:
-        return len(self.records) == self.expected
+        return self.ready and len(self.records) == self.expected
 
 
 @dataclass
@@ -150,6 +151,10 @@ class ApiClient:
     def fetch_day(self, resource: str, day: str, id_field: str, date_param: str, max_passes: int = 4) -> DayResult:
         """Recorre el día siguiendo el cursor hasta tener TODOS los registros que dicen los totales."""
         expected = self.get(f"v2/{resource}/daily-totals", {date_param: day})["records"]
+        if expected == 0:
+            # un día con cero autorizaciones no existe en un banco: es un día que todavía no se publicó (el job "día
+            # nuevo" no corrió). No es "completo": si lo fuera, el watermark lo saltearía para siempre
+            return DayResult(resource, day, {}, 0, 0, 0, 0, ready=False)
         records: dict[str, dict] = {}
         passes = pages = dups = 0
         while passes < max_passes and len(records) < expected:

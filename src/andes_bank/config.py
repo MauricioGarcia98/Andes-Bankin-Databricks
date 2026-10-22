@@ -14,7 +14,8 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 # sim = "los sistemas origen" (la verdad que genera el generador; el lakehouse NO la lee, sólo los tests y
 # las conciliaciones de control). El resto son las capas del lakehouse.
@@ -26,6 +27,11 @@ CONTAINERS = {
     "cards_legacy": "cards-legacy",    # exportes diarios de la integración vieja con el procesador (API v1)
     "api_data": "api-data",            # lo que sirve la API de tarjetas v2 (páginas pre-armadas por día)
 }
+
+# Último día de la historia que genera `generate_truth` de una sola vez. Después, el job "día nuevo" agrega un día
+# por día (generator/daily.py), así el banco sigue vivo y el lakehouse tiene algo nuevo cada mañana.
+HISTORY_END = date(2026, 10, 20)
+TZ_AR = ZoneInfo("America/Argentina/Buenos_Aires")
 
 # Fuentes del MVP (una carpeta por fuente dentro de su contenedor o endpoint).
 CORE_SOURCES = ("customers", "accounts", "transactions", "balances")
@@ -65,7 +71,7 @@ class ProjectConfig:
     base_path: str | None = None     # override local (por defecto /Volumes/...)
     scale_factor: float = 0.1
     start_date: date = date(2023, 1, 1)
-    end_date: date = date(2026, 10, 20)
+    end_date: date = HISTORY_END
     seed: int = 1998                 # año de fundación del banco
     storage_account: str = ""        # cuenta de Azure Storage (se resuelve por variable o widget)
     profile: ScaleProfile = field(default_factory=ScaleProfile)
@@ -137,6 +143,16 @@ def local_config(base_path: str, scale_factor: float = 0.002, **kwargs) -> Proje
     )
 
 
+def yesterday_ar(now: datetime | None = None) -> date:
+    """Ayer en hora argentina: el último día que el banco ya cerró."""
+    return (now or datetime.now(TZ_AR)).astimezone(TZ_AR).date() - timedelta(days=1)
+
+
+def parse_end_date(value: str) -> date:
+    """`end_date` de un job: una fecha ISO o `ayer` (el lakehouse y el día nuevo corren hasta ayer)."""
+    return yesterday_ar() if value.strip().lower() == "ayer" else date.fromisoformat(value)
+
+
 def config_from_widgets(dbutils) -> ProjectConfig:  # pragma: no cover - sólo Databricks
     """Construye la config a partir de los widgets/parámetros del job."""
 
@@ -151,6 +167,6 @@ def config_from_widgets(dbutils) -> ProjectConfig:  # pragma: no cover - sólo D
         catalog=get("catalog", "andes_bank"),
         scale_factor=float(get("scale_factor", "0.1")),
         start_date=date.fromisoformat(get("start_date", "2023-01-01")),
-        end_date=date.fromisoformat(get("end_date", "2026-10-20")),
+        end_date=parse_end_date(get("end_date", HISTORY_END.isoformat())),
         storage_account=get("storage_account", os.environ.get("ANDES_STORAGE_ACCOUNT", "")),
     )

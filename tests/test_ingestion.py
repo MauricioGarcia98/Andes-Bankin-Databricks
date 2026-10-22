@@ -111,6 +111,8 @@ def test_bronze_de_la_api_con_watermark(spark, truth):
         resource, y, m, d, _ = u.name.split("/")
         data.setdefault((resource, f"{y}-{m}-{d}"), []).extend(json.loads(u.data))
     client = _client(_api(data, "normal"))
+    # la API sólo tiene del 1 al 7 de julio: el watermark arranca el 30-jun (un día sin publicar frena la ingesta)
+    bronze_api._set_watermark(spark, cfg, "authorizations", date(2025, 6, 30))
     s = bronze_api.ingest_cards_api(spark, cfg, client, "authorizations", until=date(2025, 7, 7))
     assert s["incomplete_days"] == [] and s["days"] > 0
     assert bronze_api.watermark(spark, cfg, "authorizations") == date(2025, 7, 7)
@@ -134,8 +136,28 @@ def test_dia_incompleto_se_reintenta_al_final_de_la_corrida(spark, truth):
         waits.append(s)
         api.chaos.profile = api.chaos.profile.__class__()
 
+    bronze_api._set_watermark(spark, cfg, "authorizations", date(2025, 7, 7))
     s = bronze_api.ingest_cards_api(spark, cfg, _client(api), "authorizations", until=date(2025, 7, 10), sleep=sleep)
     assert s["incomplete_days"] == [] and s["retry_rounds"] == 1 and len(waits) == 1
     assert bronze_api.watermark(spark, cfg, "authorizations") == date(2025, 7, 10)
     b = spark.table(cfg.table("bronze", "cards_api_authorizations")).where(F.col("_window_date").isin(days))
     assert b.count() == 7_500
+
+
+def test_dia_no_publicado_no_es_completo():
+    """El job "día nuevo" no corrió: los totales dan 0. No es un día completo (si no, el watermark lo saltearía)."""
+    client = _client(_api({("authorizations", "2025-07-01"): _rows("2025-07-01", 10)}, "off"))
+    r = client.fetch_day("authorizations", "2025-07-02", "auth_id", "processing_date")
+    assert not r.ready and not r.complete and r.records == {}
+
+
+def test_watermark_se_frena_en_el_dia_no_publicado(spark, cfg):
+    days = ["2025-07-01", "2025-07-03"]                    # el 2 todavía no se publicó
+    api = _api({("authorizations", d): _rows(d, 1_500) for d in days}, "off")
+    bronze_api._set_watermark(spark, cfg, "authorizations", date(2025, 6, 30))
+    s = bronze_api.ingest_cards_api(spark, cfg, _client(api), "authorizations", until=date(2025, 7, 3),
+                                    sleep=lambda s: None)
+    assert s["not_ready_days"] == ["2025-07-02"] and s["incomplete_days"] == [] and s["retry_rounds"] == 0
+    assert bronze_api.watermark(spark, cfg, "authorizations") == date(2025, 7, 1)   # se frena antes del 2
+    recon = spark.table(cfg.table("ops", "api_reconciliation")).where("day = '2025-07-02'")
+    assert recon.count() == 0                              # el quality gate no lo ve como incompleto

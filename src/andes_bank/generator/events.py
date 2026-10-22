@@ -91,8 +91,7 @@ def authorizations_df(cards: DataFrame, merchants: DataFrame, months: DataFrame,
         .withColumn("is_fraud", F.lit(False))
     )
     # fraude: tarjetas comprometidas reciben una ráfaga de compras en rubros riesgosos el día del compromiso
-    risky = merchants.where(F.col("mcc").isin(*RISKY_MCC) | (F.col("country") != "AR")).select("merchant_key")
-    risky_keys = [r.merchant_key for r in risky.orderBy("merchant_key").limit(300).collect()] or [1]
+    risky_keys = _risky_keys(merchants)
     burst = (
         active.where("compromised AND compromise_date >= act_start AND compromise_date < act_end")
         .withColumn("i", F.explode(F.sequence(F.lit(100_001), F.lit(100_000) + int_between(uniform("card_key", salt=f"{s}-nb"), 3, 12))))
@@ -103,9 +102,24 @@ def authorizations_df(cards: DataFrame, merchants: DataFrame, months: DataFrame,
                                                  int_between(uniform("card_key", "i", salt=f"{s}-bm"), 1, len(risky_keys))))
         .withColumn("is_fraud", F.lit(True))
     )
-    cols = ["card_key", "card_token", "customer_key", "ca_ars_account_key", "card_type", "brand", "pan_last4",
-            "credit_limit_2023", "i", "auth_ts", "merchant_key", "is_fraud"]
-    auth = normal.select(cols).unionByName(burst.select(cols))
+    auth = normal.select(AUTH_BASE_COLS).unionByName(burst.select(AUTH_BASE_COLS))
+    return enrich_authorizations(auth, merchants, months, cfg)
+
+
+AUTH_BASE_COLS = ["card_key", "card_token", "customer_key", "ca_ars_account_key", "card_type", "brand", "pan_last4",
+                  "credit_limit_2023", "i", "auth_ts", "merchant_key", "is_fraud"]
+
+
+def _risky_keys(merchants: DataFrame) -> list[int]:
+    """Comercios de rubros riesgosos o del exterior: donde se usa una tarjeta robada."""
+    risky = merchants.where(F.col("mcc").isin(*RISKY_MCC) | (F.col("country") != "AR")).select("merchant_key")
+    return [r.merchant_key for r in risky.orderBy("merchant_key").limit(300).collect()] or [1]
+
+
+def enrich_authorizations(auth: DataFrame, merchants: DataFrame, months: DataFrame, cfg: ProjectConfig) -> DataFrame:
+    """De (tarjeta, i, instante, comercio, fraude) a la autorización completa: monto, respuesta, modo, billetera,
+    fecha de proceso e id. Todo sale de hashes de (card_key, i): la usan la historia y el día nuevo (daily.py)."""
+    s = str(cfg.seed)
     auth = (
         auth.join(F.broadcast(merchants.select("merchant_key", "merchant_id", "merchant_name", "mcc", "country", "city",
                                                "currency", "ecommerce")), "merchant_key")
@@ -196,9 +210,26 @@ def transactions_df(customers: DataFrame, accounts: DataFrame, auth: DataFrame, 
 
     # 1) ingresos mensuales: sueldo (o transferencia de ingresos) en la caja de ahorro en pesos
     month_starts = F.sequence(F.trunc("act_start", "month"), F.trunc(F.date_sub("act_end", 1), "month"), F.expr("INTERVAL 1 MONTH"))
-    income = (
-        acc.where("account_type = 'CA_ARS' AND NOT is_legacy_duplicate")
-        .withColumn("m", F.explode(month_starts))
+    income = income_rows(acc.withColumn("m", F.explode(month_starts)), months, cfg)
+
+    # 2) movimientos "propios" de cada cuenta
+    rate = F.lit(p.txn_per_account_month) * F.when(F.col("account_type") == "CA_USD", 0.25) \
+        .when(F.col("account_type") == "CC_ARS", 2.0).otherwise(1.0) * F.when(F.col("is_legacy_duplicate"), 0.2).otherwise(1.0)
+    n = poisson_approx(uniform("account_key", salt=f"{s}-n1"), uniform("account_key", salt=f"{s}-n2"),
+                       rate * F.datediff("act_end", "act_start") / 30.4)
+    own = own_movements(
+        acc.withColumn("i", F.explode(F.sequence(F.lit(1), F.greatest(n, F.lit(0))))).where("i > 0")
+        .withColumn("ts_utc", _random_ts(["account_key", "i"], f"{s}-ts", F.col("act_start"), F.col("act_end"))),
+        months, cfg)
+    return _with_balances(income, own, auth, accounts, acc, months, cfg)
+
+
+def income_rows(acc_m: DataFrame, months: DataFrame, cfg: ProjectConfig) -> DataFrame:
+    """Sueldo (o transferencia de ingresos) del mes `m`, entre el día 1 y el 5. `acc_m`: cuentas activas con `m`."""
+    s = str(cfg.seed)
+    start = F.lit(cfg.start_date.isoformat()).cast("date")
+    return (
+        acc_m.where("account_type = 'CA_ARS' AND NOT is_legacy_duplicate")
         .withColumn("i", F.datediff("m", start))
         .withColumn("day", F.date_add("m", int_between(uniform("account_key", "i", salt=f"{s}-sd"), 0, 4)))
         .where((F.col("day") >= F.col("act_start")) & (F.col("day") < F.col("act_end")))
@@ -213,19 +244,17 @@ def transactions_df(customers: DataFrame, accounts: DataFrame, auth: DataFrame, 
         .withColumn("reference", F.lit(None).cast("string"))
     )
 
-    # 2) movimientos "propios" de cada cuenta
+
+def own_movements(acc_i: DataFrame, months: DataFrame, cfg: ProjectConfig) -> DataFrame:
+    """Tipo, monto y canal de los movimientos "propios". `acc_i`: cuentas con `i` (número de movimiento) y `ts_utc`."""
+    s = str(cfg.seed)
     types = list(ref.TXN_TYPES)
-    rate = F.lit(p.txn_per_account_month) * F.when(F.col("account_type") == "CA_USD", 0.25) \
-        .when(F.col("account_type") == "CC_ARS", 2.0).otherwise(1.0) * F.when(F.col("is_legacy_duplicate"), 0.2).otherwise(1.0)
-    n = poisson_approx(uniform("account_key", salt=f"{s}-n1"), uniform("account_key", salt=f"{s}-n2"),
-                       rate * F.datediff("act_end", "act_start") / 30.4)
     own = (
-        acc.withColumn("i", F.explode(F.sequence(F.lit(1), F.greatest(n, F.lit(0))))).where("i > 0")
+        acc_i
         # en la cuenta corriente (pymes y premium) entran las cobranzas de sus clientes: más créditos y más grandes
         .withColumn("txn_type", F.when(F.col("account_type") == "CC_ARS",
                                        weighted_pick(uniform("account_key", "i", salt=f"{s}-tt"), types, [v[4] for v in ref.TXN_TYPES.values()]))
                     .otherwise(weighted_pick(uniform("account_key", "i", salt=f"{s}-tt"), types, [v[3] for v in ref.TXN_TYPES.values()])))
-        .withColumn("ts_utc", _random_ts(["account_key", "i"], f"{s}-ts", F.col("act_start"), F.col("act_end")))
         .withColumn("month", _month("ts_utc")).join(F.broadcast(months), "month")
     )
     med = F.create_map(*[x for k, v in ref.TXN_TYPES.items() for x in (F.lit(k), F.lit(v[1]))])[F.col("txn_type")]
@@ -244,37 +273,62 @@ def transactions_df(customers: DataFrame, accounts: DataFrame, auth: DataFrame, 
                     .otherwise(weighted_pick(uniform("account_key", "i", salt=f"{s}-ch2"), ["APP", "HOMEBANKING", "SUCURSAL"], [0.62, 0.3, 0.08])))
         .withColumn("reference", F.lit(None).cast("string"))
     )
+    return own
 
-    # 3) compras con tarjeta de débito aprobadas → débito en la caja de ahorro en pesos
-    debit = (
+
+TXN_BASE_COLS = ["account_key", "ts_utc", "amount", "reference", "txn_type", "channel"]
+CREDIT_TYPES = ("ACREDITACION_SUELDO", "TRANSFERENCIA_RECIBIDA", "DEPOSITO_EFECTIVO", "INTERESES")
+
+
+def txn_sign() -> F.Column:
+    """+1 si el movimiento entra plata a la cuenta, -1 si la saca."""
+    return F.when(F.col("txn_type").isin(*CREDIT_TYPES), 1).otherwise(-1)
+
+
+def txn_id_col(cfg: ProjectConfig) -> F.Column:
+    """Id determinístico del movimiento: hash de la semilla, la cuenta, el instante, el tipo, el monto y la referencia."""
+    return F.concat(F.lit("T"), F.upper(F.substring(F.sha2(F.concat_ws(
+        "|", F.lit(str(cfg.seed)), "account_key", F.col("ts_utc").cast("string"), "txn_type", "amount",
+        F.coalesce("reference", F.lit(""))), 256), 1, 19)))
+
+
+def debit_purchases(auth: DataFrame) -> DataFrame:
+    """Compras con tarjeta de débito aprobadas → débito COMPRA_DEBITO en la caja de ahorro en pesos."""
+    return (
         auth.where("card_type = 'DEBITO' AND status = 'APPROVED'")
         .select(F.col("ca_ars_account_key").alias("account_key"), F.col("auth_ts").alias("ts_utc"),
                 F.col("billing_amount_ars").alias("amount"), F.col("auth_id").alias("reference"))
         .withColumn("txn_type", F.lit("COMPRA_DEBITO")).withColumn("channel", F.lit("TARJETA_DEBITO"))
-        .withColumn("i", F.lit(None).cast("int"))
     )
 
-    # 4) pago del resumen de la tarjeta de crédito: día 10 del mes siguiente, por lo consumido en el mes
-    credit = (
+
+def credit_card_payments(auth: DataFrame) -> DataFrame:
+    """Pago del resumen de la tarjeta de crédito: el día 10 del mes siguiente, por lo consumido en el mes (columna `day`)."""
+    return (
         auth.where("card_type = 'CREDITO' AND status = 'APPROVED'")
         .groupBy(F.col("ca_ars_account_key").alias("account_key"), F.trunc("auth_ts", "month").alias("m"))
         .agg(F.round(F.sum("billing_amount_ars"), 2).alias("amount"))
         .withColumn("day", F.date_add(F.add_months("m", 1), 9))
-        .where(F.col("day") <= F.lit(cfg.end_date.isoformat()).cast("date"))
         .withColumn("ts_utc", F.timestamp_seconds(F.unix_timestamp(F.to_timestamp("day")) + (TZ_OFFSET_HOURS + 7) * 3600))
         .withColumn("txn_type", F.lit("PAGO_TARJETA_CREDITO")).withColumn("channel", F.lit("SISTEMA"))
         .withColumn("reference", F.concat(F.lit("RESUMEN-"), F.date_format("m", "yyyyMM")))
-        .withColumn("i", F.lit(None).cast("int"))
-        .select("account_key", "ts_utc", "amount", "reference", "txn_type", "channel", "i")
     )
 
-    sign = F.when(F.col("txn_type").isin("ACREDITACION_SUELDO", "TRANSFERENCIA_RECIBIDA", "DEPOSITO_EFECTIVO", "INTERESES"), 1).otherwise(-1)
-    cols = ["account_key", "ts_utc", "amount", "reference", "txn_type", "channel"]
+
+def _with_balances(income: DataFrame, own: DataFrame, auth: DataFrame, accounts: DataFrame, acc: DataFrame,
+                   months: DataFrame, cfg: ProjectConfig) -> DataFrame:
+    start = F.lit(cfg.start_date.isoformat()).cast("date")
+
+    # 3) compras con tarjeta de débito aprobadas → débito en la caja de ahorro en pesos
+    debit = debit_purchases(auth)
+    # 4) pago del resumen de la tarjeta de crédito: día 10 del mes siguiente, por lo consumido en el mes
+    credit = credit_card_payments(auth).where(F.col("day") <= F.lit(cfg.end_date.isoformat()).cast("date"))
+
+    cols = TXN_BASE_COLS
     txn = (
         income.select(*cols).unionByName(own.select(*cols)).unionByName(debit.select(*cols)).unionByName(credit.select(*cols))
-        .withColumn("signed_amount", F.col("amount") * sign)
-        .withColumn("txn_id", F.concat(F.lit("T"), F.upper(F.substring(
-            F.sha2(F.concat_ws("|", F.lit(s), "account_key", F.col("ts_utc").cast("string"), "txn_type", "amount", F.coalesce("reference", F.lit(""))), 256), 1, 19))))
+        .withColumn("signed_amount", F.col("amount") * txn_sign())
+        .withColumn("txn_id", txn_id_col(cfg))
     )
     # plazo fijo a fin de mes: lo que excede 2,5 ingresos mensuales sale de la cuenta (si no, los saldos crecen sin
     # techo). Con B_m = saldo acumulado a fin del mes m y T_m = el techo, lo invertido acumulado es

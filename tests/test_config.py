@@ -25,3 +25,17 @@ def test_setup_crea_las_tablas_de_ops(spark, tmp_path):
     created = create_ops_tables(spark, cfg)
     assert cfg.table("ops", "dq_results") in created and cfg.table("ops", "api_reconciliation") in created
     assert create_ops_tables(spark, cfg) == []          # idempotente
+
+
+def test_ayer_en_hora_argentina_y_meses_despues_de_2026():
+    from datetime import date, datetime, timezone
+
+    from andes_bank.config import parse_end_date, yesterday_ar
+    from andes_bank.generator.reference import monthly_index_rows
+
+    # 22-oct 01:30 UTC todavía es 21-oct en Buenos Aires (UTC-3): ayer es el 20
+    assert yesterday_ar(datetime(2026, 10, 22, 1, 30, tzinfo=timezone.utc)) == date(2026, 10, 20)
+    assert parse_end_date("2026-10-20") == date(2026, 10, 20)
+    assert parse_end_date("ayer") == yesterday_ar()
+    rows = monthly_index_rows(date(2026, 11, 1), date(2027, 2, 1))     # el banco sigue vivo en 2027
+    assert [r[0] for r in rows] == ["2026-11", "2026-12", "2027-01", "2027-02"] and rows[-1][2] == rows[-2][2]

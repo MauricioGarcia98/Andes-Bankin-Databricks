@@ -26,7 +26,8 @@ resources:
         - name: start_date
           default: ${var.start_date}
         - name: end_date
-          default: ${var.end_date}
+          # hasta ayer: el job "día nuevo" (5 h) ya publicó el día anterior en Azure
+          default: ayer
         - name: run_id
           default: "{{job.run_id}}"
       tasks:

@@ -14,7 +14,7 @@ nombre de archivo que usaría cada sistema.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 
 from pyspark.sql import Column, DataFrame, SparkSession
 from pyspark.sql import functions as F
@@ -40,6 +40,11 @@ PII_NOTE_SHARE = 0.03                                     # DAT-11
 
 def _d(value: date) -> Column:
     return F.lit(value.isoformat()).cast("date")
+
+
+def _only_day(df: DataFrame, col: str, day: date | None) -> DataFrame:
+    """Con `day` (el job "día nuevo"), sólo lo que se entrega ese día; sin `day`, toda la historia."""
+    return df if day is None else df.where(F.col(col) == _d(day))
 
 
 def _ar_number(col: Column) -> Column:
@@ -135,8 +140,8 @@ def customer_cdc(customers: DataFrame, cfg: ProjectConfig) -> DataFrame:
     return df
 
 
-def write_customers(spark: SparkSession, cfg: ProjectConfig) -> str:
-    c = customer_cdc(spark.table(cfg.table("sim", "customers")), cfg)
+def write_customers(spark: SparkSession, cfg: ProjectConfig, day: date | None = None) -> str:
+    c = _only_day(customer_cdc(spark.table(cfg.table("sim", "customers")), cfg), "delivery_date", day)
     path = cfg.staging_path("core/clientes")
     legacy = [
         F.col("op").alias("OPERACION"), F.col("customer_id").alias("NRO_CLIENTE"),
@@ -166,7 +171,7 @@ def write_customers(spark: SparkSession, cfg: ProjectConfig) -> str:
 
 
 # -------------------------------------------------------------------------------------- core: cuentas
-def write_accounts(spark: SparkSession, cfg: ProjectConfig) -> str:
+def write_accounts(spark: SparkSession, cfg: ProjectConfig, day: date | None = None) -> str:
     s = str(cfg.seed)
     a = spark.table(cfg.table("sim", "accounts"))
     start, mig = _d(cfg.start_date), _d(ref.CORE_MIGRATION_DATE)
@@ -182,6 +187,7 @@ def write_accounts(spark: SparkSession, cfg: ProjectConfig) -> str:
         .withColumn("cbu_out", F.when(uniform("account_key", salt=f"{s}-x-cbu") < SHORT_CBU_SHARE, F.substring("cbu", 1, 21))
                     .otherwise(F.col("cbu")))
     )
+    df = _only_day(df, "delivery_date", day)
     legacy = [
         F.col("op").alias("OPERACION"), F.col("account_id").alias("NRO_CUENTA"), F.col("customer_id").alias("NRO_CLIENTE"),
         F.col("account_type").alias("TIPO_CUENTA"), F.when(F.col("currency") == "USD", "2").otherwise("1").alias("COD_MONEDA"),
@@ -201,7 +207,7 @@ def write_accounts(spark: SparkSession, cfg: ProjectConfig) -> str:
 
 
 # -------------------------------------------------------------------------------------- core: tarjetas
-def write_cards(spark: SparkSession, cfg: ProjectConfig) -> str:
+def write_cards(spark: SparkSession, cfg: ProjectConfig, day: date | None = None) -> str:
     """Maestro de tarjetas del core: une el token que conoce el procesador con el cliente y la cuenta."""
     c = (spark.table(cfg.table("sim", "cards"))
          .join(spark.table(cfg.table("sim", "customers")).select("customer_key", "customer_id"), "customer_key")
@@ -217,6 +223,7 @@ def write_cards(spark: SparkSession, cfg: ProjectConfig) -> str:
         .unionByName(c.where(alive_at(mig)).withColumn("delivery_date", mig).withColumn("op", F.lit("I")))
         .where(F.col("delivery_date") <= _d(cfg.end_date))
     )
+    df = _only_day(df, "delivery_date", day)
     legacy = [
         F.col("op").alias("OPERACION"), F.col("card_token").alias("TOKEN_TARJETA"), F.col("customer_id").alias("NRO_CLIENTE"),
         F.col("account_id").alias("NRO_CUENTA"), F.col("card_type").alias("TIPO"), F.col("brand").alias("MARCA"),
@@ -262,8 +269,11 @@ def transaction_export(txn: DataFrame, cfg: ProjectConfig) -> DataFrame:
     return df
 
 
-def write_transactions(spark: SparkSession, cfg: ProjectConfig) -> str:
-    df = transaction_export(spark.table(cfg.table("sim", "transactions")), cfg)
+def write_transactions(spark: SparkSession, cfg: ProjectConfig, day: date | None = None) -> str:
+    txn = spark.table(cfg.table("sim", "transactions"))
+    if day is not None:   # lo del día y lo del anterior (los re-envíos llegan al día siguiente: DAT-01)
+        txn = txn.where(F.col("posting_date").between(_d(day - timedelta(days=1)), _d(day)))
+    df = _only_day(transaction_export(txn, cfg), "delivery_date", day)
     legacy = [
         F.col("txn_id").alias("NRO_MOVIMIENTO"), F.col("account_id").alias("NRO_CUENTA"),
         F.date_format(_local(F.col("ts_utc")), "dd/MM/yyyy HH:mm:ss").alias("FECHA_HORA"),
@@ -287,8 +297,9 @@ def write_transactions(spark: SparkSession, cfg: ProjectConfig) -> str:
     return path
 
 
-def write_balances(spark: SparkSession, cfg: ProjectConfig) -> str:
-    b = spark.table(cfg.table("sim", "balances")).withColumn("delivery_date", F.col("balance_date"))
+def write_balances(spark: SparkSession, cfg: ProjectConfig, day: date | None = None) -> str:
+    b = _only_day(spark.table(cfg.table("sim", "balances")).withColumn("delivery_date", F.col("balance_date")),
+                  "delivery_date", day)
     legacy = [
         F.col("account_id").alias("NRO_CUENTA"), F.date_format("balance_date", "dd/MM/yyyy").alias("FECHA_SALDO"),
         _ar_number(F.col("closing_balance")).alias("SALDO_CIERRE"),
@@ -304,7 +315,7 @@ def write_balances(spark: SparkSession, cfg: ProjectConfig) -> str:
 
 
 # ----------------------------------------------------------------------------------------- procesador
-def write_cards_legacy(spark: SparkSession, cfg: ProjectConfig) -> dict[str, str]:
+def write_cards_legacy(spark: SparkSession, cfg: ProjectConfig, day: date | None = None) -> dict[str, str]:
     """Integración vieja con el procesador (v1): un JSON por día de proceso, montos en centavos, epoch ms."""
     a = spark.table(cfg.table("sim", "authorizations")).where(F.col("processing_date") <= _d(ref.API_V1_LAST_EXPORT))
     auth = a.select(
@@ -330,12 +341,13 @@ def write_cards_legacy(spark: SparkSession, cfg: ProjectConfig) -> dict[str, str
     out = {}
     for name, df in (("autorizaciones", auth), ("liquidaciones", sett)):
         path = cfg.staging_path(f"cards_legacy/{name}")
-        df.repartition("delivery_date").write.mode("overwrite").partitionBy("delivery_date").json(path)
+        (_only_day(df, "delivery_date", day).repartition("delivery_date").write.mode("overwrite")
+         .option("partitionOverwriteMode", "dynamic").partitionBy("delivery_date").json(path))
         out[name] = path
     return out
 
 
-def write_api_data(spark: SparkSession, cfg: ProjectConfig) -> dict[str, str]:
+def write_api_data(spark: SparkSession, cfg: ProjectConfig, day: date | None = None) -> dict[str, str]:
     """Registros canónicos v2 que sirve la API, un JSONL por día de proceso (upload.py los parte en páginas)."""
     a = spark.table(cfg.table("sim", "authorizations")).where(F.col("processing_date") >= _d(ref.API_V2_LAUNCH))
     auth = a.select(
@@ -354,8 +366,8 @@ def write_api_data(spark: SparkSession, cfg: ProjectConfig) -> dict[str, str]:
     out = {}
     for name, df in (("authorizations", auth), ("settlements", sett)):
         path = cfg.staging_path(f"api_data/{name}")
-        (df.repartition("delivery_date").sortWithinPartitions("delivery_date", df.columns[0])
-         .write.mode("overwrite").partitionBy("delivery_date").json(path))
+        (_only_day(df, "delivery_date", day).repartition("delivery_date").sortWithinPartitions("delivery_date", df.columns[0])
+         .write.mode("overwrite").option("partitionOverwriteMode", "dynamic").partitionBy("delivery_date").json(path))
         out[name] = path
     return out
 
@@ -366,11 +378,16 @@ WRITERS = {
 }
 
 
-def export_all(spark: SparkSession, cfg: ProjectConfig, only: list[str] | None = None) -> dict[str, str]:
-    """Exporta todas las fuentes, o sólo las de `only` (ej. ["core/tarjetas"], ["cards_legacy"], ["api_data"])."""
-    paths = {name: fn(spark, cfg) for name, fn in WRITERS.items() if not only or name in only}
+def export_all(spark: SparkSession, cfg: ProjectConfig, only: list[str] | None = None,
+               day: date | None = None) -> dict[str, str]:
+    """Exporta todas las fuentes, o sólo las de `only` (ej. ["core/tarjetas"], ["cards_legacy"], ["api_data"]).
+
+    Con `day` exporta sólo lo que se entrega ese día (job "día nuevo"): el overwrite es dinámico, así que las carpetas
+    de los demás días quedan como estaban.
+    """
+    paths = {name: fn(spark, cfg, day) for name, fn in WRITERS.items() if not only or name in only}
     if not only or "cards_legacy" in only:
-        paths.update({f"cards_legacy/{k}": v for k, v in write_cards_legacy(spark, cfg).items()})
+        paths.update({f"cards_legacy/{k}": v for k, v in write_cards_legacy(spark, cfg, day).items()})
     if not only or "api_data" in only:
-        paths.update({f"api_data/{k}": v for k, v in write_api_data(spark, cfg).items()})
+        paths.update({f"api_data/{k}": v for k, v in write_api_data(spark, cfg, day).items()})
     return paths
