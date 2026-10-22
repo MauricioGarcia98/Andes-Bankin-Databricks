@@ -1,0 +1,83 @@
+title: "Andes · Tarjetas y fraude"
+domain: Prevención de fraude
+description: >-
+  Para Prevención de Fraude y el negocio de tarjetas: consumo, aprobación, rechazos por sospecha (código 59), rubros
+  riesgosos, compras en el exterior y tarjetas con patrones de fraude.
+users: "Martín Ibarra (Jefe de Prevención de Fraude) y analistas de tarjetas"
+tables:
+  - gold.fact_autorizacion
+  - gold.dim_comercio
+  - gold.dim_tarjeta
+  - gold.mart_fraude_diario
+metric_views:
+  - semantic.mv_tarjetas
+functions:
+  - semantic.fn_alertas_fraude
+instructions: |
+  Sos el asistente de Tarjetas y Prevención de Fraude de Andes Bank. El procesador es Andes Card Processing.
+  - Una fila de gold.fact_autorizacion es un intento de compra (aprobado o rechazado). Consumo = suma de importe_ars de las aprobadas.
+  - "Rechazo por sospecha", "antifraude" o "código 59" = rechazo_por_sospecha = true.
+  - Rubros riesgosos (dim_comercio.rubro_riesgoso): electrónica, joyerías, apuestas online, aerolíneas y servicios digitales.
+  - Para "tarjetas sospechosas" o "posible fraude" en un período usá fn_alertas_fraude('yyyy-MM-dd', 'yyyy-MM-dd').
+  - Fechas: la columna fecha es el día de la compra en hora argentina. "Ayer" o "la semana pasada" se cuentan desde la
+    fecha máxima de fact_autorizacion (los datos llegan hasta el último día procesado).
+  - Montos en pesos sin decimales. Las compras en el exterior tienen importe en USD y importe_ars al oficial.
+  - billetera (Apple Pay / Google Pay) se informa recién desde marzo de 2026: antes es nula, no "sin billetera".
+sample_questions:
+  - "¿Qué rubros tuvieron más rechazos por sospecha de fraude el último mes?"
+  - "¿Qué tarjetas tuvieron un patrón de fraude en septiembre de 2026?"
+  - "¿Cuál es la tasa de aprobación por tipo de tarjeta?"
+  - "¿Cuánto se consumió en el exterior por mes en 2026?"
+examples:
+  - question: "Rechazos por sospecha por rubro en el último mes de datos"
+    sql: |
+      SELECT co.rubro, count(*) AS rechazos
+      FROM ${catalog}.gold.fact_autorizacion a JOIN ${catalog}.gold.dim_comercio co ON co.comercio_id = a.comercio_id
+      WHERE a.rechazo_por_sospecha AND a.fecha > (SELECT max(fecha) FROM ${catalog}.gold.fact_autorizacion) - INTERVAL 30 DAYS
+      GROUP BY co.rubro ORDER BY rechazos DESC
+  - question: "Tarjetas con patrón de fraude en un período"
+    sql: "SELECT * FROM ${catalog}.semantic.fn_alertas_fraude('2026-09-01', '2026-09-30') ORDER BY monto_ars DESC"
+  - question: "Tasa de aprobación por tipo de tarjeta (metric view)"
+    sql: |
+      SELECT `Tipo de tarjeta`, round(MEASURE(`Tasa de aprobación`) * 100, 2) AS aprobacion_pct
+      FROM ${catalog}.semantic.mv_tarjetas GROUP BY ALL
+  - question: "Consumo en el exterior por mes"
+    sql: |
+      SELECT date_format(a.fecha, 'yyyy-MM') AS mes, round(sum(a.importe_ars), 0) AS consumo_ars, round(sum(a.importe_usd), 0) AS consumo_usd
+      FROM ${catalog}.gold.fact_autorizacion a JOIN ${catalog}.gold.dim_comercio co ON co.comercio_id = a.comercio_id
+      WHERE a.aprobada AND co.es_exterior GROUP BY mes ORDER BY mes
+benchmarks:
+- q: ¿Cuántas autorizaciones de tarjeta hay en total?
+  sql: SELECT count(*) FROM ${catalog}.gold.fact_autorizacion
+- q: ¿Cuál es la tasa de aprobación general?
+  sql: SELECT round(avg(CASE WHEN aprobada THEN 1.0 ELSE 0 END) * 100, 2) FROM ${catalog}.gold.fact_autorizacion
+- q: ¿Cuántos rechazos por sospecha de fraude hubo en 2025?
+  sql: SELECT count(*) FROM ${catalog}.gold.fact_autorizacion WHERE rechazo_por_sospecha AND year(fecha) = 2025
+- q: ¿Qué rubro tuvo más rechazos por sospecha de fraude?
+  sql: SELECT co.rubro FROM ${catalog}.gold.fact_autorizacion a JOIN ${catalog}.gold.dim_comercio co ON co.comercio_id = a.comercio_id WHERE a.rechazo_por_sospecha GROUP BY co.rubro ORDER BY count(*) DESC
+    LIMIT 1
+- q: ¿Cuánto se consumió con tarjetas (aprobadas) en 2025 en pesos?
+  sql: SELECT round(sum(importe_ars), 0) FROM ${catalog}.gold.fact_autorizacion WHERE aprobada AND year(fecha) = 2025
+- q: ¿Qué rubro concentra más consumo aprobado?
+  sql: SELECT co.rubro FROM ${catalog}.gold.fact_autorizacion a JOIN ${catalog}.gold.dim_comercio co ON co.comercio_id = a.comercio_id WHERE a.aprobada GROUP BY co.rubro ORDER BY sum(a.importe_ars) DESC
+    LIMIT 1
+- q: ¿Cuántas compras aprobadas fueron en comercios del exterior?
+  sql: SELECT count(*) FROM ${catalog}.gold.fact_autorizacion a JOIN ${catalog}.gold.dim_comercio co ON co.comercio_id = a.comercio_id WHERE a.aprobada AND co.es_exterior
+- q: ¿Cuál es el ticket promedio aprobado con tarjeta de crédito en 2026?
+  sql: SELECT round(avg(importe_ars), 0) FROM ${catalog}.gold.fact_autorizacion WHERE aprobada AND tipo_tarjeta = 'CREDITO' AND year(fecha) = 2026
+- q: ¿Cuántos rechazos por fondos insuficientes hubo?
+  sql: SELECT count(*) FROM ${catalog}.gold.fact_autorizacion WHERE codigo_respuesta = '51_FONDOS_INSUFICIENTES'
+- q: ¿Qué marca de tarjeta tiene más autorizaciones?
+  sql: SELECT marca FROM ${catalog}.gold.fact_autorizacion GROUP BY marca ORDER BY count(*) DESC LIMIT 1
+- q: ¿Cuántas tarjetas distintas compraron en 2025?
+  sql: SELECT count(DISTINCT token_tarjeta) FROM ${catalog}.gold.fact_autorizacion WHERE aprobada AND year(fecha) = 2025
+- q: ¿Cuántas autorizaciones aprobadas siguen sin liquidar?
+  sql: SELECT count(*) FROM ${catalog}.gold.fact_autorizacion WHERE aprobada AND NOT liquidada
+- q: ¿Cuántos días tarda en promedio una compra en liquidarse?
+  sql: SELECT round(avg(dias_a_liquidar), 2) FROM ${catalog}.gold.fact_autorizacion WHERE liquidada
+- q: ¿Qué porcentaje de las compras contactless fue con billetera en 2026?
+  sql: SELECT round(avg(CASE WHEN billetera IS NOT NULL THEN 1.0 ELSE 0 END) * 100, 1) FROM ${catalog}.gold.fact_autorizacion WHERE modo_ingreso = 'CONTACTLESS' AND fecha >= '2026-03-01'
+- q: ¿Cuántas tarjetas tuvieron patrón de fraude en todo 2025?
+  sql: SELECT count(DISTINCT token_tarjeta) FROM ${catalog}.semantic.fn_alertas_fraude('2025-01-01', '2025-12-31')
+- q: ¿En qué hora del día hay más compras aprobadas?
+  sql: SELECT hora_local FROM ${catalog}.gold.fact_autorizacion WHERE aprobada GROUP BY hora_local ORDER BY count(*) DESC LIMIT 1

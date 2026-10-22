@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "andes_bank"
+version = "0.1.0"
+description = "Andes Bank: lakehouse bancario E2E en Databricks Free Edition con Genie en el centro."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Mauricio García" }]
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+  "pyspark==4.0.1",
+  "delta-spark==4.0.0",
+  "pytest>=8",
+  "ruff>=0.6",
+  "pyyaml>=6",
+]
+azure = ["azure-storage-blob>=12.20", "requests>=2.31"]
+genie = ["databricks-sdk>=0.60"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra -q"
+markers = [
+  "spark: necesita Spark local (más lento)",
+]
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+extend-exclude = ["notebooks", "docs"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM"]
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+# los módulos de la Azure Function se importan por nombre (la Function corre con su carpeta como raíz)
+known-first-party = ["andes_bank", "api", "chaos", "store", "tokens"]

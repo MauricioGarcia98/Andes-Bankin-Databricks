@@ -1,0 +1,352 @@
+{
+  "title": "Andes · Tarjetas y fraude",
+  "description": "Para Prevención de Fraude y el negocio de tarjetas: consumo, aprobación, rechazos por sospecha (código 59), rubros riesgosos, compras en el exterior y tarjetas con patrones de fraude.",
+  "domain": "Prevención de fraude",
+  "users": "Martín Ibarra (Jefe de Prevención de Fraude) y analistas de tarjetas",
+  "serialized_space": {
+    "version": 2,
+    "config": {
+      "sample_questions": [
+        {
+          "id": "49128084da9d3e9cda0f73383a0eb271",
+          "question": [
+            "¿Cuánto se consumió en el exterior por mes en 2026?"
+          ]
+        },
+        {
+          "id": "787883becdfd0320d02031d6da490eab",
+          "question": [
+            "¿Qué rubros tuvieron más rechazos por sospecha de fraude el último mes?"
+          ]
+        },
+        {
+          "id": "80322a5d1628e26ec972d7ade2a3a2da",
+          "question": [
+            "¿Qué tarjetas tuvieron un patrón de fraude en septiembre de 2026?"
+          ]
+        },
+        {
+          "id": "ae863861237a881ca496ceeafbd60c27",
+          "question": [
+            "¿Cuál es la tasa de aprobación por tipo de tarjeta?"
+          ]
+        }
+      ]
+    },
+    "data_sources": {
+      "tables": [
+        {
+          "identifier": "${catalog}.gold.dim_comercio"
+        },
+        {
+          "identifier": "${catalog}.gold.dim_tarjeta"
+        },
+        {
+          "identifier": "${catalog}.gold.fact_autorizacion"
+        },
+        {
+          "identifier": "${catalog}.gold.mart_fraude_diario"
+        },
+        {
+          "identifier": "${catalog}.semantic.mv_tarjetas"
+        }
+      ]
+    },
+    "instructions": {
+      "text_instructions": [
+        {
+          "id": "61b9d4d5c5d76cbfa210b54ad328fa2c",
+          "content": [
+            "Sos el asistente de Tarjetas y Prevención de Fraude de Andes Bank. El procesador es Andes Card Processing.\n",
+            "- Una fila de gold.fact_autorizacion es un intento de compra (aprobado o rechazado). Consumo = suma de importe_ars de las aprobadas.\n",
+            "- \"Rechazo por sospecha\", \"antifraude\" o \"código 59\" = rechazo_por_sospecha = true.\n",
+            "- Rubros riesgosos (dim_comercio.rubro_riesgoso): electrónica, joyerías, apuestas online, aerolíneas y servicios digitales.\n",
+            "- Para \"tarjetas sospechosas\" o \"posible fraude\" en un período usá fn_alertas_fraude('yyyy-MM-dd', 'yyyy-MM-dd').\n",
+            "- Fechas: la columna fecha es el día de la compra en hora argentina. \"Ayer\" o \"la semana pasada\" se cuentan desde la\n",
+            "  fecha máxima de fact_autorizacion (los datos llegan hasta el último día procesado).\n",
+            "- Montos en pesos sin decimales. Las compras en el exterior tienen importe en USD y importe_ars al oficial.\n",
+            "- billetera (Apple Pay / Google Pay) se informa recién desde marzo de 2026: antes es nula, no \"sin billetera\"."
+          ]
+        }
+      ],
+      "example_question_sqls": [
+        {
+          "id": "006f2598446408efafcb62bf3f6f9258",
+          "question": [
+            "Tarjetas con patrón de fraude en un período"
+          ],
+          "sql": [
+            "SELECT * FROM ${catalog}.semantic.fn_alertas_fraude('2026-09-01', '2026-09-30') ORDER BY monto_ars DESC"
+          ]
+        },
+        {
+          "id": "0a3ce1d95f77db93cb5b192b5128fc9c",
+          "question": [
+            "Rechazos por sospecha por rubro en el último mes de datos"
+          ],
+          "sql": [
+            "SELECT co.rubro, count(*) AS rechazos\n",
+            "FROM ${catalog}.gold.fact_autorizacion a JOIN ${catalog}.gold.dim_comercio co ON co.comercio_id = a.comercio_id\n",
+            "WHERE a.rechazo_por_sospecha AND a.fecha > (SELECT max(fecha) FROM ${catalog}.gold.fact_autorizacion) - INTERVAL 30 DAYS\n",
+            "GROUP BY co.rubro ORDER BY rechazos DESC"
+          ]
+        },
+        {
+          "id": "34ce7f0529ce6dc7a5e004afd5b583a2",
+          "question": [
+            "Consumo en el exterior por mes"
+          ],
+          "sql": [
+            "SELECT date_format(a.fecha, 'yyyy-MM') AS mes, round(sum(a.importe_ars), 0) AS consumo_ars, round(sum(a.importe_usd), 0) AS consumo_usd\n",
+            "FROM ${catalog}.gold.fact_autorizacion a JOIN ${catalog}.gold.dim_comercio co ON co.comercio_id = a.comercio_id\n",
+            "WHERE a.aprobada AND co.es_exterior GROUP BY mes ORDER BY mes"
+          ]
+        },
+        {
+          "id": "44237c8835d237f158f76f6032a84265",
+          "question": [
+            "Tasa de aprobación por tipo de tarjeta (metric view)"
+          ],
+          "sql": [
+            "SELECT `Tipo de tarjeta`, round(MEASURE(`Tasa de aprobación`) * 100, 2) AS aprobacion_pct\n",
+            "FROM ${catalog}.semantic.mv_tarjetas GROUP BY ALL"
+          ]
+        }
+      ],
+      "sql_functions": [
+        {
+          "id": "5a9c816c4a87dca9da2887c21407d597",
+          "identifier": "${catalog}.semantic.fn_alertas_fraude"
+        }
+      ]
+    },
+    "benchmarks": {
+      "questions": [
+        {
+          "id": "016e831afbf04709626d8208081182fe",
+          "question": [
+            "¿Cuánto se consumió con tarjetas (aprobadas) en 2025 en pesos?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT round(sum(importe_ars), 0) FROM ${catalog}.gold.fact_autorizacion WHERE aprobada AND year(fecha) = 2025"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "0d69201fa0a28c0ccfd73e4dbd225674",
+          "question": [
+            "¿Cuántas tarjetas tuvieron patrón de fraude en todo 2025?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT count(DISTINCT token_tarjeta) FROM ${catalog}.semantic.fn_alertas_fraude('2025-01-01', '2025-12-31')"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "2645c3cc4a4ec448c3e82121ffbfed10",
+          "question": [
+            "¿Qué marca de tarjeta tiene más autorizaciones?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT marca FROM ${catalog}.gold.fact_autorizacion GROUP BY marca ORDER BY count(*) DESC LIMIT 1"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "3b21430b659b780449ff43dcb000d961",
+          "question": [
+            "¿Cuántas autorizaciones de tarjeta hay en total?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT count(*) FROM ${catalog}.gold.fact_autorizacion"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "42234d41b4ace24e91f9c3b533c97058",
+          "question": [
+            "¿Cuántas autorizaciones aprobadas siguen sin liquidar?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT count(*) FROM ${catalog}.gold.fact_autorizacion WHERE aprobada AND NOT liquidada"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "79685328976d8e62d926e49745e746c6",
+          "question": [
+            "¿Cuántos rechazos por fondos insuficientes hubo?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT count(*) FROM ${catalog}.gold.fact_autorizacion WHERE codigo_respuesta = '51_FONDOS_INSUFICIENTES'"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "7b417101f2bb31b876915180a45bf4ad",
+          "question": [
+            "¿Cuántos días tarda en promedio una compra en liquidarse?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT round(avg(dias_a_liquidar), 2) FROM ${catalog}.gold.fact_autorizacion WHERE liquidada"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "80760a61df8fec4bd1acdcbed1c32a57",
+          "question": [
+            "¿Cuál es la tasa de aprobación general?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT round(avg(CASE WHEN aprobada THEN 1.0 ELSE 0 END) * 100, 2) FROM ${catalog}.gold.fact_autorizacion"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "aa4bc112c4c3c912e60173844911af31",
+          "question": [
+            "¿Qué porcentaje de las compras contactless fue con billetera en 2026?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT round(avg(CASE WHEN billetera IS NOT NULL THEN 1.0 ELSE 0 END) * 100, 1) FROM ${catalog}.gold.fact_autorizacion WHERE modo_ingreso = 'CONTACTLESS' AND fecha >= '2026-03-01'"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ad2b827f4a9a1bcace8f79ff84a9c4d2",
+          "question": [
+            "¿En qué hora del día hay más compras aprobadas?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT hora_local FROM ${catalog}.gold.fact_autorizacion WHERE aprobada GROUP BY hora_local ORDER BY count(*) DESC LIMIT 1"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "beea4655381ae54daeecb2d2d09746a4",
+          "question": [
+            "¿Qué rubro tuvo más rechazos por sospecha de fraude?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT co.rubro FROM ${catalog}.gold.fact_autorizacion a JOIN ${catalog}.gold.dim_comercio co ON co.comercio_id = a.comercio_id WHERE a.rechazo_por_sospecha GROUP BY co.rubro ORDER BY count(*) DESC LIMIT 1"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "dc4526ecba0de9887c3ce18c641716a0",
+          "question": [
+            "¿Qué rubro concentra más consumo aprobado?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT co.rubro FROM ${catalog}.gold.fact_autorizacion a JOIN ${catalog}.gold.dim_comercio co ON co.comercio_id = a.comercio_id WHERE a.aprobada GROUP BY co.rubro ORDER BY sum(a.importe_ars) DESC LIMIT 1"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ec81e6b3f6946fa5a66f21fc4310a25e",
+          "question": [
+            "¿Cuántas compras aprobadas fueron en comercios del exterior?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT count(*) FROM ${catalog}.gold.fact_autorizacion a JOIN ${catalog}.gold.dim_comercio co ON co.comercio_id = a.comercio_id WHERE a.aprobada AND co.es_exterior"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "f4b5b38ad5cff2a62dd671e67f59e398",
+          "question": [
+            "¿Cuántos rechazos por sospecha de fraude hubo en 2025?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT count(*) FROM ${catalog}.gold.fact_autorizacion WHERE rechazo_por_sospecha AND year(fecha) = 2025"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "f9065e769cfb307845fe41e64ee662aa",
+          "question": [
+            "¿Cuál es el ticket promedio aprobado con tarjeta de crédito en 2026?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT round(avg(importe_ars), 0) FROM ${catalog}.gold.fact_autorizacion WHERE aprobada AND tipo_tarjeta = 'CREDITO' AND year(fecha) = 2026"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "f913955c48e0987c88ec07614855e128",
+          "question": [
+            "¿Cuántas tarjetas distintas compraron en 2025?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT count(DISTINCT token_tarjeta) FROM ${catalog}.gold.fact_autorizacion WHERE aprobada AND year(fecha) = 2025"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

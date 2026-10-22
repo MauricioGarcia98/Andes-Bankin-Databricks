@@ -1,0 +1,452 @@
+{
+  "title": "Andes · Comercial y clientes",
+  "description": "Para la Gerencia de Banca Individual y Pymes: clientes, productos, cross-selling, saldos, actividad digital y plan sueldo, por segmento, región y sucursal.",
+  "domain": "Comercial",
+  "users": "Lucía Ferreyra (Gerenta de Banca Individual) y los gerentes de sucursal",
+  "serialized_space": {
+    "version": 2,
+    "config": {
+      "sample_questions": [
+        {
+          "id": "05159812901878dea383b75e4e183ae9",
+          "question": [
+            "¿Qué porcentaje de los clientes PREMIUM opera por canales digitales?"
+          ]
+        },
+        {
+          "id": "544e5628054fa1170f7de1aaf1b736ae",
+          "question": [
+            "¿Cuántos clientes cobran el sueldo en el banco y no tienen tarjeta de crédito?"
+          ]
+        },
+        {
+          "id": "5e46919b64f5e636ca9dbf3274615511",
+          "question": [
+            "¿Cuántos clientes tenemos por segmento y región?"
+          ]
+        },
+        {
+          "id": "cad7a8266ca21fc9456c2edb93ae2200",
+          "question": [
+            "¿Qué sucursal tiene más clientes con tarjeta de crédito?"
+          ]
+        },
+        {
+          "id": "f073016dcf84a818c7dabb7500594f27",
+          "question": [
+            "¿Cuánto pipeline abierto hay por producto en el CRM?"
+          ]
+        }
+      ]
+    },
+    "data_sources": {
+      "tables": [
+        {
+          "identifier": "${catalog}.gold.dim_cliente"
+        },
+        {
+          "identifier": "${catalog}.gold.dim_cuenta"
+        },
+        {
+          "identifier": "${catalog}.gold.dim_cuenta_crm"
+        },
+        {
+          "identifier": "${catalog}.gold.dim_sucursal"
+        },
+        {
+          "identifier": "${catalog}.gold.fact_caso"
+        },
+        {
+          "identifier": "${catalog}.gold.fact_oportunidad"
+        },
+        {
+          "identifier": "${catalog}.gold.mart_cliente_360"
+        },
+        {
+          "identifier": "${catalog}.gold.mart_pipeline_comercial"
+        },
+        {
+          "identifier": "${catalog}.semantic.mv_clientes"
+        }
+      ]
+    },
+    "instructions": {
+      "text_instructions": [
+        {
+          "id": "06d852e55568af31039f23276370063b",
+          "content": [
+            "Sos el asistente Comercial de Andes Bank, un banco argentino regulado por el BCRA con sucursales en Cuyo, NOA y Centro.\n",
+            "- \"Clientes\" = filas de gold.mart_cliente_360 (un cliente vigente por fila). \"Personas\" = COUNT(DISTINCT persona_id):\n",
+            "  por la fusión de 2008 hay personas con un número de cliente de Cuyo (CUY-) y otro del NOA (NOA-).\n",
+            "  Si preguntan \"cuánta gente\" o \"personas\", contá personas; si preguntan \"clientes\", contá clientes.\n",
+            "- Para el estado actual de un cliente usá gold.dim_cliente con is_current = true. La historia (cambios de segmento) está en dim_cliente.\n",
+            "- Segmentos: MASIVO, PLUS, PREMIUM, PYME. Regiones: CUYO, NOA, CENTRO, DIGITAL.\n",
+            "- Montos en pesos sin decimales y con separador de miles. Si piden dólares usá las columnas *_usd.\n",
+            "- Para la ficha de un cliente puntual usá fn_resumen_cliente('<cliente_id>').\n",
+            "- DNI, CUIT, email y teléfono pueden salir enmascarados según los permisos del usuario: no es un error.\n",
+            "- Cada usuario ve sólo las regiones que tiene asignadas (filtro de fila): si faltan regiones, es por permisos.\n",
+            "- CRM comercial (desde jun-2024): oportunidades en gold.fact_oportunidad, reclamos y consultas en gold.fact_caso,\n",
+            "  cuentas del CRM en gold.dim_cuenta_crm. Se unen al core por persona_id. \"Pipeline\" = oportunidades abiertas\n",
+            "  (cerrada = false); \"ganado\" = ganada = true. Las cuentas duplicadas del CRM ya están unificadas en cuenta_principal_id:\n",
+            "  contá empresas con COUNT(DISTINCT cuenta_principal_id), nunca contando filas de dim_cuenta_crm.\n",
+            "- metodo_match dice cómo se unió la cuenta del CRM al core (ID_CORE, CUIT o SIN_MATCH). Los prospectos no son clientes."
+          ]
+        }
+      ],
+      "example_question_sqls": [
+        {
+          "id": "2e79db4bf0bf7971823c69f5ce6340ab",
+          "question": [
+            "¿Qué porcentaje de las cuentas de clientes del CRM no se pudo unir al core?"
+          ],
+          "sql": [
+            "SELECT round(100 * avg(CASE WHEN metodo_match = 'SIN_MATCH' THEN 1 ELSE 0 END), 1) AS pct_sin_match\n",
+            "FROM ${catalog}.gold.dim_cuenta_crm WHERE tipo != 'Prospect' AND NOT es_duplicada"
+          ]
+        },
+        {
+          "id": "604fa107359581bb841ee8b9fcc57041",
+          "question": [
+            "Oportunidad de venta: cobran sueldo y no tienen tarjeta de crédito, por sucursal"
+          ],
+          "sql": [
+            "SELECT sucursal, count(*) AS clientes\n",
+            "FROM ${catalog}.gold.mart_cliente_360\n",
+            "WHERE estado = 'ACTIVO' AND cobra_sueldo AND NOT tiene_tarjeta_credito\n",
+            "GROUP BY sucursal ORDER BY clientes DESC"
+          ]
+        },
+        {
+          "id": "7f88422fbeab72763da441052b5dfa35",
+          "question": [
+            "Saldo total por región (metric view)"
+          ],
+          "sql": [
+            "SELECT `Región`, round(MEASURE(`Saldo total (ARS)`), 0) AS saldo_ars\n",
+            "FROM ${catalog}.semantic.mv_clientes GROUP BY ALL ORDER BY saldo_ars DESC"
+          ]
+        },
+        {
+          "id": "a7e7421cef86b89794b1ce5c7b75ee04",
+          "question": [
+            "¿Cuántas personas tienen dos números de cliente?"
+          ],
+          "sql": [
+            "SELECT count(DISTINCT persona_id) FROM ${catalog}.gold.dim_cliente\n",
+            "WHERE is_current AND regla_identidad = 'DNI+NOMBRE'"
+          ]
+        },
+        {
+          "id": "c0ec730a2b5ef6b758fac76ffd5de9a1",
+          "question": [
+            "Clientes y productos promedio por segmento"
+          ],
+          "sql": [
+            "SELECT segmento, count(*) AS clientes, round(avg(cantidad_productos), 2) AS productos_promedio\n",
+            "FROM ${catalog}.gold.mart_cliente_360 WHERE estado = 'ACTIVO' GROUP BY segmento ORDER BY clientes DESC"
+          ]
+        },
+        {
+          "id": "c4932e151999dd6d960228ca28dad67f",
+          "question": [
+            "Pipeline abierto por producto"
+          ],
+          "sql": [
+            "SELECT producto, count(*) AS oportunidades, round(sum(monto_ars), 0) AS pipeline_ars\n",
+            "FROM ${catalog}.gold.fact_oportunidad WHERE NOT cerrada GROUP BY producto ORDER BY pipeline_ars DESC NULLS LAST"
+          ]
+        }
+      ],
+      "sql_functions": [
+        {
+          "id": "79869de4fd78322150365c2f107e1c15",
+          "identifier": "${catalog}.semantic.fn_resumen_cliente"
+        }
+      ]
+    },
+    "benchmarks": {
+      "questions": [
+        {
+          "id": "03ca6aa67fdb337edb5093e5d0174047",
+          "question": [
+            "¿Qué región tiene más clientes?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT region FROM ${catalog}.gold.mart_cliente_360 GROUP BY region ORDER BY count(*) DESC LIMIT 1"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "1fa4d592c7280f66340f418fbf15d8c2",
+          "question": [
+            "¿Cuántos clientes activos hay en el segmento PREMIUM?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT count(*) FROM ${catalog}.gold.mart_cliente_360 WHERE segmento = 'PREMIUM' AND estado = 'ACTIVO'"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "2d60c593924b8620a180c9f4fe59ae80",
+          "question": [
+            "¿Cuántos clientes son 100% digitales?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT count(*) FROM ${catalog}.gold.mart_cliente_360 WHERE region = 'DIGITAL'"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "2eef53021ed822bf791cd821b66e1e24",
+          "question": [
+            "¿Cuántos clientes cambiaron de segmento alguna vez?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT count(DISTINCT cliente_id) FROM (SELECT cliente_id, count(DISTINCT segmento) AS s FROM ${catalog}.gold.dim_cliente GROUP BY cliente_id) WHERE s > 1"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "45c3231022c54febe8b31b5acc30ceae",
+          "question": [
+            "¿Cuántas empresas distintas hay cargadas en el CRM?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT count(DISTINCT cuenta_principal_id) FROM ${catalog}.gold.dim_cuenta_crm"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "4ed4ff20aa475fcf7dbed6d019acb814",
+          "question": [
+            "¿Cuántos clientes tienen tarjeta de crédito?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT count(*) FROM ${catalog}.gold.mart_cliente_360 WHERE tiene_tarjeta_credito"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "5790087e4b2283370c7e9d64c50c719c",
+          "question": [
+            "¿Cuántas personas distintas son clientes?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT count(DISTINCT persona_id) FROM ${catalog}.gold.mart_cliente_360"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "5c1de828a3ebcfafede8ac45df9e31fe",
+          "question": [
+            "¿Qué producto tiene más oportunidades ganadas?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT producto FROM ${catalog}.gold.fact_oportunidad WHERE ganada GROUP BY producto ORDER BY count(*) DESC LIMIT 1"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "6fea378bd8b8174e586b35a1fadfe270",
+          "question": [
+            "¿Cuántos productos tiene en promedio un cliente PYME?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT round(avg(cantidad_productos), 2) FROM ${catalog}.gold.mart_cliente_360 WHERE segmento = 'PYME'"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "7f95f38280b9b9a56171c0b1105bb7ae",
+          "question": [
+            "Saldo total en pesos de los clientes de la región NOA"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT round(sum(saldo_total_ars), 0) FROM ${catalog}.gold.mart_cliente_360 WHERE region = 'NOA'"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "8db01cb6169d90cd164de2a6a1247a5d",
+          "question": [
+            "¿Cuántos clientes cobran el sueldo en el banco y no tienen tarjeta de crédito?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT count(*) FROM ${catalog}.gold.mart_cliente_360 WHERE cobra_sueldo AND NOT tiene_tarjeta_credito AND estado = 'ACTIVO'"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ad8f1793d874a647341e881c2b2eb201",
+          "question": [
+            "¿Cuántos casos abiertos hay en el CRM?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT count(*) FROM ${catalog}.gold.fact_caso WHERE NOT cerrado"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "b330bf45eea9a770b31af2e52b1c7671",
+          "question": [
+            "¿Cuántas personas tienen dos números de cliente por la fusión con el banco del NOA?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT count(DISTINCT persona_id) FROM ${catalog}.gold.dim_cliente WHERE is_current AND regla_identidad = 'DNI+NOMBRE'"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "b4e9ce3a71654b5353d83d1a3514fd55",
+          "question": [
+            "¿Qué porcentaje de los clientes tiene caja de ahorro en dólares?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT round(avg(CASE WHEN tiene_caja_usd THEN 1.0 ELSE 0 END) * 100, 1) FROM ${catalog}.gold.mart_cliente_360"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "c662b8cad3c20eda6934782b0a8276f2",
+          "question": [
+            "¿Cuántos clientes dieron de baja su relación con el banco?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT count(*) FROM ${catalog}.gold.mart_cliente_360 WHERE estado = 'BAJA'"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "cdc2afe6a306e4f74aef286eead7c531",
+          "question": [
+            "Porcentaje digital promedio de los clientes PREMIUM"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT round(avg(porcentaje_digital_90d), 1) FROM ${catalog}.gold.mart_cliente_360 WHERE segmento = 'PREMIUM'"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "d93a688cad8d975ae8f7be523a6309f9",
+          "question": [
+            "¿Cuántos clientes vigentes tenemos?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT count(*) FROM ${catalog}.gold.mart_cliente_360"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "da51157b70129d36494b287fae1e10df",
+          "question": [
+            "¿Cuántas oportunidades abiertas hay en el CRM?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT count(*) FROM ${catalog}.gold.fact_oportunidad WHERE NOT cerrada"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ea52914a99ab17445c916df3ecd2fc04",
+          "question": [
+            "¿Cuántos clientes son empresas?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT count(*) FROM ${catalog}.gold.mart_cliente_360 WHERE tipo_persona = 'JURIDICA'"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "fc96b9dba369bb3dc41969ce253f4b16",
+          "question": [
+            "¿Qué sucursal física tiene más clientes?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT sucursal FROM ${catalog}.gold.mart_cliente_360 WHERE sucursal_id <> 999 GROUP BY sucursal ORDER BY count(*) DESC LIMIT 1"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

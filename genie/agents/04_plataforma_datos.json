@@ -1,0 +1,348 @@
+{
+  "title": "Andes · Plataforma de datos",
+  "description": "Para el equipo de datos (data engineers y analistas): salud de las ingestas, errores de las APIs (429, 5xx, tokens vencidos), archivos rechazados en el borde, reglas de calidad y conciliaciones entre sistemas.",
+  "domain": "Data Engineering",
+  "users": "El equipo de datos de Andes Bank",
+  "serialized_space": {
+    "version": 2,
+    "config": {
+      "sample_questions": [
+        {
+          "id": "2373444de8a3e06b53d4ac0209b90cef",
+          "question": [
+            "¿Qué archivos se rechazaron en el borde y por qué?"
+          ]
+        },
+        {
+          "id": "29149a93a6f4433ee9d84018cde392a2",
+          "question": [
+            "¿Qué reglas de calidad fallaron en la última corrida?"
+          ]
+        },
+        {
+          "id": "30bb136127cfb3984b6341986424b549",
+          "question": [
+            "¿Cómo estuvieron las APIs en los últimos 7 días?"
+          ]
+        },
+        {
+          "id": "ca0748fcf694f97d6a7a41be5d7d08d2",
+          "question": [
+            "¿Cuántos 429 nos devolvió la API de tarjetas y cuánto tardamos en promedio?"
+          ]
+        }
+      ]
+    },
+    "data_sources": {
+      "tables": [
+        {
+          "identifier": "${catalog}.gold.mart_conciliacion_tarjetas"
+        },
+        {
+          "identifier": "${catalog}.ops.api_reconciliation"
+        },
+        {
+          "identifier": "${catalog}.semantic.mv_plataforma_apis"
+        },
+        {
+          "identifier": "${catalog}.semantic.v_api_llamadas"
+        },
+        {
+          "identifier": "${catalog}.semantic.v_archivos_recibidos"
+        },
+        {
+          "identifier": "${catalog}.semantic.v_calidad"
+        },
+        {
+          "identifier": "${catalog}.silver.balance_breaks"
+        },
+        {
+          "identifier": "${catalog}.silver.quarantine"
+        }
+      ]
+    },
+    "instructions": {
+      "text_instructions": [
+        {
+          "id": "e16a9ce62795aa7bfe963c231cd07a0c",
+          "content": [
+            "Sos el asistente del equipo de datos de Andes Bank. Respondés sobre la OPERACIÓN del lakehouse, no sobre el negocio.\n",
+            "- Pedidos a las APIs: semantic.v_api_llamadas (una fila por pedido HTTP, incluidos los reintentos). resultado:\n",
+            "  OK, RATE_LIMIT (429), TOKEN_VENCIDO (401), ERROR_SERVIDOR (5xx), TIMEOUT_O_RED, RESPUESTA_INVALIDA (JSON roto o 200 con error).\n",
+            "- Para \"cómo están las APIs\" o \"salud de la ingesta\" usá fn_salud_ingesta(<días>).\n",
+            "- Días incompletos de la API: ops.api_reconciliation (expected vs received; complete). Un día puede tener varias filas\n",
+            "  (una por intento); el estado vigente es el último checked_at.\n",
+            "- Archivos recibidos de los sistemas origen y qué se hizo con cada uno: semantic.v_archivos_recibidos (estado LANDED,\n",
+            "  EMPTY, CORRUPT, DUPLICATE_CONTENT, CHANGED).\n",
+            "- Calidad: semantic.v_calidad. severidad 'fail' frena la publicación; 'warn' es suciedad conocida que se mide.\n",
+            "  \"La última corrida\" = el run_id con el checked_at máximo.\n",
+            "- Movimientos que el core nunca mandó: silver.balance_breaks (se detectan porque el saldo no cierra).\n",
+            "- Filas descartadas con su motivo: silver.quarantine.\n",
+            "- Los códigos de problema (DAT-01, API-06, ING-03...) son los del catálogo docs/03_catalogo_de_problemas.md."
+          ]
+        }
+      ],
+      "example_question_sqls": [
+        {
+          "id": "1e89e7c36ddebb66df56104f979b025c",
+          "question": [
+            "Archivos rechazados en el borde"
+          ],
+          "sql": [
+            "SELECT sistema, archivo, estado, detalle FROM ${catalog}.semantic.v_archivos_recibidos\n",
+            "WHERE estado IN ('CORRUPT', 'DUPLICATE_CONTENT', 'EMPTY', 'CHANGED') ORDER BY fecha_entrega"
+          ]
+        },
+        {
+          "id": "2a53b709e9588b06dabb4d3c22bf6723",
+          "question": [
+            "Reglas de calidad de la última corrida"
+          ],
+          "sql": [
+            "SELECT regla, severidad, problema, filas_que_fallan, filas_totales, paso FROM ${catalog}.semantic.v_calidad\n",
+            "WHERE run_id = (SELECT max_by(run_id, checked_at) FROM ${catalog}.semantic.v_calidad) ORDER BY paso, severidad"
+          ]
+        },
+        {
+          "id": "4721c9d02dce4fa823797d326127a5a4",
+          "question": [
+            "Salud de las APIs en la última semana"
+          ],
+          "sql": [
+            "SELECT * FROM ${catalog}.semantic.fn_salud_ingesta(7)"
+          ]
+        },
+        {
+          "id": "4d62f4e187ee2f60f5f3fa1d98430373",
+          "question": [
+            "Pedidos por resultado y recurso"
+          ],
+          "sql": [
+            "SELECT recurso, resultado, count(*) AS pedidos FROM ${catalog}.semantic.v_api_llamadas\n",
+            "GROUP BY recurso, resultado ORDER BY recurso, pedidos DESC"
+          ]
+        }
+      ],
+      "sql_functions": [
+        {
+          "id": "0711f8ae268fda28823b3b2a4d01ab75",
+          "identifier": "${catalog}.semantic.fn_salud_ingesta"
+        }
+      ]
+    },
+    "benchmarks": {
+      "questions": [
+        {
+          "id": "010e002e3641cd4f2f80ea6dc77b79f6",
+          "question": [
+            "¿Cuántos movimientos faltantes se detectaron por saldo?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT count(*) FROM ${catalog}.silver.balance_breaks"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "068243dec5f4f43210a07446e2387065",
+          "question": [
+            "¿Cuántos pedidos a las APIs fallaron?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT count(*) FROM ${catalog}.semantic.v_api_llamadas WHERE resultado <> 'OK'"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "2343d928c846a1287c24c2187bea139d",
+          "question": [
+            "¿Qué archivo se rechazó por tener el mismo contenido que otro?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT archivo FROM ${catalog}.semantic.v_archivos_recibidos WHERE estado = 'DUPLICATE_CONTENT'"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "2a4780e740ade822035432b646743d13",
+          "question": [
+            "¿Falló alguna regla bloqueante en la última corrida?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT count(*) FROM ${catalog}.semantic.v_calidad WHERE run_id = (SELECT max_by(run_id, checked_at) FROM ${catalog}.semantic.v_calidad) AND NOT paso"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "3011d65ee5741f7b8fc512e87d4bfa84",
+          "question": [
+            "¿Cuántas filas de datos aterrizaron en total?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT sum(filas) FROM ${catalog}.semantic.v_archivos_recibidos WHERE estado IN ('LANDED', 'EMPTY')"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "38725dd3ce917fadb5507f86afaff3fc",
+          "question": [
+            "¿Cuántas reglas de calidad se evaluaron en la última corrida?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT count(*) FROM ${catalog}.semantic.v_calidad WHERE run_id = (SELECT max_by(run_id, checked_at) FROM ${catalog}.semantic.v_calidad)"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "6210bc2a671af8d0cbca869f7e7dd852",
+          "question": [
+            "¿Cuántas compras con débito del procesador no aparecen en el core?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT sum(solo_en_procesador) FROM ${catalog}.gold.mart_conciliacion_tarjetas"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "776dcf08ffc5021d7b87ad54c59c5fe7",
+          "question": [
+            "¿Qué problema del catálogo tiene más filas afectadas en la última corrida?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT problema FROM ${catalog}.semantic.v_calidad WHERE run_id = (SELECT max_by(run_id, checked_at) FROM ${catalog}.semantic.v_calidad) AND problema <> '-' ORDER BY filas_que_fallan DESC LIMIT 1"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "77ac8edf501d125f600ee05dcebbf1bf",
+          "question": [
+            "¿Cuántos archivos llegaron de los sistemas origen?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT count(*) FROM ${catalog}.semantic.v_archivos_recibidos"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "9509fb617a5be5579830fedfb4f52e15",
+          "question": [
+            "¿Cuántos rate limit (429) devolvió la API de tarjetas?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT count(*) FROM ${catalog}.semantic.v_api_llamadas WHERE status_code = 429 AND recurso IN ('autorizaciones', 'liquidaciones')"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "b241681e0da7cf948c41d159cc706888",
+          "question": [
+            "¿Cuántas filas hay en cuarentena?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT count(*) FROM ${catalog}.silver.quarantine"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "b620f596b23db008e049d4d11be441ff",
+          "question": [
+            "¿Qué archivo llegó corrupto?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT archivo FROM ${catalog}.semantic.v_archivos_recibidos WHERE estado = 'CORRUPT'"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "b70ede7fe5b565cca1c8c60d69525601",
+          "question": [
+            "¿Cuántos días de la API quedaron incompletos?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT count(*) FROM (SELECT resource, day, max_by(complete, checked_at) AS ok FROM ${catalog}.ops.api_reconciliation GROUP BY ALL) WHERE NOT ok"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ba25dda9d6bac66066d268404d39896a",
+          "question": [
+            "¿Cuántos CUIT inválidos detectó la última corrida?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT filas_que_fallan FROM ${catalog}.semantic.v_calidad WHERE regla = 'cuit_valido' AND run_id = (SELECT max_by(run_id, checked_at) FROM ${catalog}.semantic.v_calidad)"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "cfc38f5e32224f3ae54141b38b803b79",
+          "question": [
+            "¿Cuántos pedidos se hicieron a las APIs en total?"
+          ],
+          "answer": [
+            {
+              "format": "SQL",
+              "content": [
+                "SELECT count(*) FROM ${catalog}.semantic.v_api_llamadas"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

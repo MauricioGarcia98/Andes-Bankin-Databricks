@@ -1,0 +1,16 @@
+__pycache__/
+*.egg-info/
+.venv/
+.pytest_cache/
+.ruff_cache/
+spark-warehouse/
+metastore_db/
+derby.log
+.databricks/
+dist/
+build/
+local.settings.json
+.python_packages/
+*.zip
+node_modules/
+docs/diagramas/*.png
