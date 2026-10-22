@@ -70,7 +70,7 @@ el pipeline está bien, **recupera la verdad**; los tests lo verifican fila por 
 | [06 · Gold y calidad](06_gold_y_calidad.md) | modelo estrella, marts, CRM en gold y el quality gate | `src/andes_bank/gold/`, `quality/` |
 | [07 · SQL: gobierno y capa semántica](07_sql_gobierno_y_semantica.md) | comentarios, claves, tags, máscaras, filtros por región, vistas, metric views, funciones certificadas | `sql/` |
 | [08 · Genie](08_genie.md) | agents como código, build, deploy, preguntar y medir | `genie/`, `scripts/*genie*` |
-| [09 · Orquestación y CI](09_orquestacion.md) | Asset Bundle, los dos jobs, los notebooks, CI de GitHub | `databricks.yml`, `resources/`, `notebooks/`, `.github/` |
+| [09 · Orquestación y CI](09_orquestacion.md) | Asset Bundle, los tres jobs, los notebooks, CI de GitHub | `databricks.yml`, `resources/`, `notebooks/`, `.github/` |
 | [10 · Tests](10_tests.md) | qué prueba cada test y cómo se prueba sin nube | `tests/` |
 | [11 · Scripts, docs, diagramas y asistentes](11_scripts_docs_y_diagramas.md) | diagramas como código, tags de etapa, documentación, Genie Code | `scripts/diagramas/`, `scripts/etapas.sh`, `docs/`, `construir/`, `.assistant*` |
 | [12 · El recorrido de un dato](12_recorrido_de_un_dato.md) | un movimiento y una compra con tarjeta, desde que "pasan" hasta que Genie los cuenta | todo junto |
@@ -85,7 +85,7 @@ Andes-Bankin-Datbricks/
 ├── README.md                     portada: estado, índice de docs, MVP
 ├── pyproject.toml                paquete andes_bank, dependencias (dev/azure/genie), pytest y ruff        → cap. 01
 ├── databricks.yml                Asset Bundle: variables y target dev                                    → cap. 09
-├── resources/                    los dos jobs (fuentes y lakehouse)                                      → cap. 09
+├── resources/                    los tres jobs (fuentes, día nuevo y lakehouse)                          → cap. 09
 ├── notebooks/                    notebooks DELGADOS: cada uno llama al paquete (una tarea de job c/u)    → cap. 09
 ├── src/andes_bank/               TODO el código de datos, testeado
 │   ├── config.py                 nombres de UC, rutas del Volume, escala                                 → cap. 01

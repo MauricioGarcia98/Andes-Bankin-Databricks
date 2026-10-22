@@ -70,7 +70,7 @@ def panorama() -> Diagram:
     d.arrow("sem", "genie", sides="rl", via=[(1770, 805), (1770, 360)])
     d.arrow("genie", "areas", sides="bt")
 
-    d.note(40, 980, 2140, 70, "Orquestación: 2 Lakeflow Jobs (fuentes y lakehouse)  ·  Despliegue: Databricks Asset Bundles + scripts de az  ·  "
+    d.note(40, 980, 2140, 70, "Orquestación: 3 Lakeflow Jobs (fuentes, día nuevo, lakehouse)  ·  Despliegue: Databricks Asset Bundles + scripts de az  ·  "
                               "CI: GitHub Actions (ruff, pytest, bundle validate)  ·  Secretos: scope andes_bank", "gris", 18)
     return d
 
@@ -269,9 +269,12 @@ def despliegue() -> Diagram:
     d.box("f_crm", 960, 320, 220, 70, "crm_publish", "naranja", 17)
     d.arrow("f_setup", "f_fx", sides="bt")
     d.arrow("f_gt", "f_crm", sides="bl", via=[(810, 355)])
-    d.text(1420, 330, "simula el mundo exterior:\nno es parte del lakehouse", 17, MUTED)
+    d.text(1480, 180, "Job andes-bank-dia-nuevo · 5 h", 20, "#2f9e44")
+    d.box("d_new", 1480, 220, 340, 80, "nuevo_dia: genera, exporta\ny sube el día de ayer", "verde", 17)
+    d.box("d_fx", 1860, 220, 260, 80, "fx_mirror\n(BCRA hasta ayer)", "verde", 17)
+    d.text(1480, 330, "los dos simulan el mundo exterior:\nno son parte del lakehouse", 17, MUTED)
 
-    d.zone(400, 470, 1760, 420, "Job andes-bank-lakehouse (diario, serverless)", "verde", icon="jobs")
+    d.zone(400, 470, 1760, 420, "Job andes-bank-lakehouse (todos los días a las 7, hasta ayer)", "verde", icon="jobs")
     d.box("l_setup", 440, 650, 180, 70, "setup", "gris", 17)
     ing = [("l_sync", "landing_sync", 530), ("l_api", "bronze_api", 620), ("l_fx", "bronze_fx", 710), ("l_crm", "bronze_crm", 800)]
     for k, t, y in ing:
@@ -329,25 +332,25 @@ def linea_de_tiempo() -> Diagram:
     d = Diagram("08_linea_de_tiempo", "La historia del banco (y por qué los datos vienen así)")
     d.heading(40, 20, "Cada hito deja una marca en los datos: el lakehouse tiene que entenderla, no esconderla")
     hitos = [  # (x, arriba?, fecha, qué pasó, qué deja en los datos, color, ícono)
-        (80, True, "1998 · 2008", "nace en Cuyo; compra\nel banco del NOA", "la misma persona con\ndos números (DAT-08)", "naranja", "user"),
-        (330, False, "ene 2023", "empieza la historia\nque genera el proyecto", "start_date del\nscale_factor", "gris", "settings"),
+        (80, True, "1998 · 2008", "nace en Cuyo;\ncompra el NOA", "la misma persona con\ndos números (DAT-08)", "naranja", "user"),
+        (330, False, "ene 2023", "empieza la\nhistoria simulada", "start_date del\nscale_factor", "gris", "settings"),
         (560, True, "13 dic 2023", "devaluación", "saltan los montos en\npesos y el dólar oficial", "rojo", "bar_chart"),
-        (790, False, "11 mar 2024", "migración del core", "dos contratos: latin1 ';'\nvs. UTF-8 gzip (DAT-03)", "azul", "database"),
-        (1020, True, "3 jun 2024", "CRM comercial nuevo", "cuentas sin ID del core\n(DAT-09, DAT-16)", "rosa", "user"),
-        (1250, False, "2 ene 2025", "columna canal_digital", "schema drift en\nmovimientos", "amarillo", "document"),
-        (1480, True, "1 abr 2025", "API v2 del procesador", "v1 y v2 a la vez hasta\njun-2025 (API-09)", "violeta", "function"),
-        (1710, False, "may-nov 2025", "incidentes de entrega", "vacío, tarde, truncado,\nduplicado (ING-01..04)", "rojo", "error"),
-        (1940, True, "1 mar 2026", "wallet_type en la API", "campo nuevo sin\naviso (API-11)", "violeta", "function"),
-        (2170, False, "20 oct 2026", "fin del período", "end_date: hasta acá\nhay datos", "verde", "genie"),
+        (790, False, "11 mar 2024", "migración\ndel core", "dos contratos: latin1 ';'\nvs. UTF-8 gzip (DAT-03)", "azul", "database"),
+        (1020, True, "3 jun 2024", "CRM comercial\nnuevo", "cuentas sin ID del core\n(DAT-09, DAT-16)", "rosa", "user"),
+        (1250, False, "2 ene 2025", "columna\ncanal_digital", "schema drift en\nmovimientos", "amarillo", "document"),
+        (1480, True, "1 abr 2025", "API v2 del\nprocesador", "v1 y v2 a la vez hasta\njun-2025 (API-09)", "violeta", "function"),
+        (1710, False, "may-nov 2025", "incidentes\nde entrega", "vacío, tarde, truncado,\nduplicado (ING-01..04)", "rojo", "error"),
+        (1940, True, "1 mar 2026", "wallet_type\nen la API", "campo nuevo sin\naviso (API-11)", "violeta", "function"),
+        (2170, False, "20 oct 2026", "fin de la historia;\nsigue día a día", "job 'día nuevo' a las 5:\nun día por día (daily.py)", "verde", "genie"),
     ]
     y_line = 520
     d.box("eje_i", 40, y_line - 4, 8, 8, "", "gris")
     d.box("eje_f", 2400, y_line - 4, 8, 8, "", "gris")
     d.arrow("eje_i", "eje_f", sides="rl", color="#495057")
     for i, (x, up, fecha, que, marca, color, icon) in enumerate(hitos):
-        y = 160 if up else 600
-        d.box(f"h{i}", x, y, 210, 150, f"{fecha}\n{que}", color, 17, icon=icon)
-        d.text(x + 10, y + 160, marca, 15, "#495057")
+        y = 150 if up else 600
+        d.box(f"h{i}", x, y, 215, 190, f"{fecha}\n{que}", color, 17, icon=icon)
+        d.text(x + 4, y + 200, marca, 14, "#495057")
         d.box(f"p{i}", x + 100, y_line - 8, 16, 16, "", color, shape="ellipse")
         d.arrow(f"h{i}", f"p{i}", sides="bt" if up else "tb", dashed=True, color="#868e96")
     return d

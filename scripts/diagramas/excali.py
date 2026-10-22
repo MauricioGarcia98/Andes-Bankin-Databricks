@@ -23,8 +23,12 @@ ZONE = {"azul": "#e7f5ff", "verde": "#ebfbee", "naranja": "#fff4e6", "violeta": 
         "amarillo": "#fff9db", "turquesa": "#e6fcf5", "rosa": "#fff0f6", "rojo": "#fff5f5"}
 INK = "#1e1e1e"
 MUTED = "#495057"
-FONT = 1           # 1 = Virgil (a mano), 2 = Helvetica, 3 = Cascadia (código)
+FONT = 2           # 1 = Virgil (a mano), 2 = Helvetica, 3 = Cascadia (código). Helvetica: nítida en pantalla
 LINE = 1.25
+# GitHub muestra un lienzo de ~2.100 px en ~830 px: el texto se achica a un 40 %. Todos los tamaños de letra se
+# multiplican por TEXT_SCALE para que en pantalla queden entre 11 y 16 px.
+TEXT_SCALE = 1.5
+ROUGHNESS = 0      # 0 = líneas limpias (más definidas); 1 = trazo "a mano"
 ICONS_FILE = Path(__file__).resolve().parent / "iconos.json"
 
 
@@ -47,10 +51,27 @@ def _bbox(elements: list[dict]) -> tuple[float, float, float, float]:
     return min(xs), min(ys), max(xs) - min(xs), max(ys) - min(ys)
 
 
+# ancho de cada carácter en Helvetica/Arial, en "em" (las métricas estándar de la fuente): medir bien el texto
+# permite usar letra grande sin que se salga de las cajas
+_NARROW = dict.fromkeys("il.,:;'|!·", 0.28) | dict.fromkeys("jtfrI()[]/ ", 0.33) | dict.fromkeys("-\"*", 0.36)
+_WIDE = dict.fromkeys("mwMW", 0.86) | dict.fromkeys("ABCDEGHKNOQRUVXY&%@", 0.70) | dict.fromkeys("FJLPSTZ", 0.62)
+
+
+def _char_w(ch: str) -> float:
+    if ch in _NARROW:
+        return _NARROW[ch]
+    if ch in _WIDE:
+        return _WIDE[ch]
+    return 0.56 if ch.isdigit() or ch.isupper() else 0.52
+
+
 def _text_size(text: str, size: float, family: int = FONT) -> tuple[float, float]:
     lines = text.split("\n")
-    k = 0.6 if family == 3 else 0.5
-    return max(len(line) for line in lines) * size * k, len(lines) * size * LINE
+    if family == 2:
+        width = max(sum(_char_w(ch) for ch in line) for line in lines) * size * 1.03
+    else:
+        width = max(len(line) for line in lines) * size * (0.6 if family == 3 else 0.5)
+    return width, len(lines) * size * LINE
 
 
 @dataclass
@@ -93,7 +114,7 @@ class Diagram:
     def _base(self, kind: str, eid: str, x, y, w, h, **kw) -> dict:
         el = {"id": eid, "type": kind, "x": x, "y": y, "width": w, "height": h, "angle": 0,
               "strokeColor": INK, "backgroundColor": "transparent", "fillStyle": "solid", "strokeWidth": 2,
-              "strokeStyle": "solid", "roughness": 1, "opacity": 100, "groupIds": [], "frameId": None,
+              "strokeStyle": "solid", "roughness": ROUGHNESS, "opacity": 100, "groupIds": [], "frameId": None,
               "roundness": None, "seed": self._rng.randrange(1, 2**31), "version": 1,
               "versionNonce": self._rng.randrange(1, 2**31), "isDeleted": False, "boundElements": [],
               "updated": 1, "link": None, "locked": False}
@@ -105,8 +126,12 @@ class Diagram:
                align: str = "center", valign: str = "middle", pad_left: float = 0) -> dict:
         tw, th = _text_size(text, size, family)
         free = container["width"] - pad_left
-        if tw > free - 12:
-            print(f"  ⚠ {self.name}: el texto no entra en {container['id']} ({tw:.0f} > {free - 12:.0f}): {text!r}")
+        fit = min((free - 16) / tw, (container["height"] - 8) / th, 1.0)
+        if fit < 1:   # no entra con la letra grande: se achica lo justo (nunca por debajo del tamaño original)
+            size = max(size * fit, size / TEXT_SCALE)
+            tw, th = _text_size(text, size, family)
+            if tw > free - 12:
+                print(f"  ⚠ {self.name}: el texto no entra en {container['id']} ({tw:.0f} > {free - 12:.0f}): {text!r}")
         x = container["x"] + pad_left + (free - tw) / 2 if align == "center" else container["x"] + 12
         y = container["y"] + (container["height"] - th) / 2 if valign == "middle" else container["y"] + 10
         tid = self._id("t")
@@ -117,6 +142,7 @@ class Diagram:
 
     # --------------------------------------------------------------------------------- dibujar
     def text(self, x, y, text: str, size: float = 20, color: str = INK, family: int = FONT) -> dict:
+        size *= TEXT_SCALE
         tw, th = _text_size(text, size, family)
         return self._base("text", self._id("t"), x, y, tw, th, strokeColor=color, text=text, originalText=text,
                           fontSize=size, fontFamily=family, textAlign="left", verticalAlign="top",
@@ -125,12 +151,13 @@ class Diagram:
     def heading(self, x, y, subtitle: str | None = None) -> None:
         self.text(x, y, self.title, 36)
         if subtitle:
-            self.text(x, y + 52, subtitle, 20, MUTED)
+            self.text(x, y + 36 * TEXT_SCALE * LINE + 4, subtitle, 20, MUTED)
 
     def zone(self, x, y, w, h, title: str, color: str = "gris", size: float = 22, icon: str | None = None) -> None:
         self._base("rectangle", self._id("z"), x, y, w, h, backgroundColor=ZONE[color], strokeColor=STROKE[color],
                    strokeWidth=1, strokeStyle="dashed", roundness={"type": 3}, roughness=0)
         dx = 0
+        size = size * 0.8   # el título de la zona: más chico que el texto de las cajas (text() lo agranda)
         if icon:
             iw, ih = self.icon_dims(icon, 36)
             self.icon(icon, x + 14, y + 8 + (36 - ih) / 2, 36)
@@ -141,6 +168,7 @@ class Diagram:
             family: int = FONT, dashed: bool = False, icon: str | None = None, icon_size: float | None = None) -> Box:
         """Caja con texto centrado. Con `icon`, el ícono de la biblioteca va a la izquierda y el texto se centra en
         el espacio que queda."""
+        size *= TEXT_SCALE
         el = self._base(shape, bid, x, y, w, h, backgroundColor=FILL[color], strokeColor=STROKE[color],
                         roundness={"type": 3} if shape == "rectangle" else {"type": 2},
                         strokeStyle="dashed" if dashed else "solid")
@@ -198,6 +226,7 @@ class Diagram:
 
     def note(self, x, y, w, h, text: str, color: str = "amarillo", size: float = 16) -> None:
         """Nota con texto arriba a la izquierda. El alto lo pone el texto (`h` queda como mínimo)."""
+        size *= TEXT_SCALE
         h = max(_text_size(text, size)[1] + 24, min(h, 60))
         el = self._base("rectangle", self._id("n"), x, y, w, h, backgroundColor=FILL[color],
                         strokeColor=STROKE[color], strokeWidth=1, roundness={"type": 3})
@@ -230,6 +259,7 @@ class Diagram:
             i = seg if seg is not None else max(
                 range(len(pts) - 1), key=lambda k: abs(pts[k + 1][0] - pts[k][0]) + abs(pts[k + 1][1] - pts[k][1]))
             mx, my = (pts[i][0] + pts[i + 1][0]) / 2, (pts[i][1] + pts[i + 1][1]) / 2
+            size *= TEXT_SCALE
             tw, th = _text_size(label, size)
             horizontal = abs(pts[i + 1][0] - pts[i][0]) >= abs(pts[i + 1][1] - pts[i][1])
             # al costado de la línea (arriba si es horizontal, a la derecha si es vertical), no encima

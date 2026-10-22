@@ -1,7 +1,7 @@
 # 09 · Orquestación y CI
 
 > `databricks.yml`, `resources/`, `notebooks/` y `.github/workflows/ci.yml`. Cómo se despliega todo en Databricks
-> como código, cómo están armados los dos jobs, qué hace cada notebook y qué corre en cada PR.
+> como código, cómo están armados los tres jobs, qué hace cada notebook y qué corre en cada PR.
 
 ![Despliegue y jobs](../diagramas/06_despliegue_jobs.svg)
 
@@ -33,7 +33,7 @@ todos los días (en modo development es la única forma de que un schedule quede
 
 **CLI:** con la versión 0.270 el deploy fallaba porque la clave de firma de Terraform había vencido; con 0.290 funciona.
 
-## 2. Los dos jobs
+## 2. Los tres jobs
 
 ### `resources/andes_fuentes.job.yml` → job `andes-bank-fuentes`
 
@@ -84,9 +84,22 @@ Las cuatro ingestas corren **en paralelo** (archivos y APIs no dependen entre s�
 `ops.dq_results` y une cada resultado de calidad con su corrida. Timeout de 4 horas, `max_concurrent_runs: 1`
 (dos corridas a la vez pisarían watermarks).
 
-**¿Por qué todos los días si no llegan datos nuevos?** Todo es incremental (Auto Loader, watermarks): sin datos nuevos
-la corrida termina rápido, y el quality gate igual vuelve a controlar gold. Hoy el generador termina el 20-oct-2026, así
-que las corridas diarias no traen novedades; generar "un día nuevo" por día es una mejora pendiente.
+**`end_date: ayer`.** El lakehouse procesa hasta ayer (hora argentina): `config.parse_end_date` traduce `ayer` a una
+fecha. Todo es incremental (Auto Loader, watermarks), así que cada mañana procesa sólo el día que publicó el job de
+abajo, y el quality gate vuelve a controlar gold.
+
+### `resources/andes_dia.job.yml` → job `andes-bank-dia-nuevo`
+
+El mundo exterior sigue andando: **todos los días a las 5:00 (hora argentina)**, dos horas antes del lakehouse.
+
+| tarea | notebook | qué hace |
+|---|---|---|
+| `nuevo_dia` | 06 | `daily.run_new_days`: genera en `sim.*` cada día que falta desde el último generado hasta ayer, lo exporta (sólo ese día) y lo sube a Azure con la SAS de escritura |
+| `fx_mirror` | 04 | vuelve a copiar la serie real del BCRA (hasta ayer) al espejo |
+
+Si un día el job no corre (o falla), al siguiente genera los días que faltan, en orden. Y si el lakehouse corre antes
+de que el día esté publicado, la API devuelve totales en 0: el día queda como "no publicado", no se concilia ni se
+escribe, y el watermark no lo saltea (ver [04 · Ingesta](04_ingesta.md)).
 
 ## 3. Los notebooks (`notebooks/`)
 

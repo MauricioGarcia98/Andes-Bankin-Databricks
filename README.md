@@ -1,8 +1,8 @@
 # 🏦 Andes Bank · Lakehouse bancario E2E en Databricks Free Edition
 
 > **Estado: MVP terminado (22-oct-2026).** Las 4 fuentes llegan a bronze con el caos activado, el quality gate pasa
-> (22 de 22 reglas), los 4 Genie Agents aciertan entre el 80 y el 100 % de sus benchmarks, el job del lakehouse corre
-> todos los días a las 7 y Azure costó USD 0,02 en el mes. Ver [Operación](docs/operacion.md) y
+> (22 de 22 reglas), los 4 Genie Agents aciertan entre el 80 y el 100 % de sus benchmarks, cada mañana un job
+> genera y publica el día de ayer (el banco sigue vivo) y el lakehouse lo procesa a las 7, y Azure costó USD 0,02 en el mes. Ver [Operación](docs/operacion.md) y
 > [el curso para reconstruirlo](construir/README.md).
 
 Andes Bank es un banco argentino **ficticio**, regulado por el BCRA. Este repo construye su plataforma de datos de

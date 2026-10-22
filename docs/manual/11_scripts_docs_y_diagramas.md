@@ -11,7 +11,7 @@ puede abrir y retocar en excalidraw.com.
 
 | archivo | qué hace |
 |---|---|
-| `excali.py` | un **mini-DSL** sin dependencias: `Diagram` con `heading`, `zone` (área de color con título e ícono), `box` (caja con texto, color, forma e ícono), `arrow` (flecha entre cajas con lado de salida/llegada, puntos intermedios y etiqueta), `note` (nota con altura automática según el texto), `text` e `icon`. Paleta fija (rellenos pastel y bordes), tipografía a mano (Virgil), grilla de 20 px. `save()` escribe un `.excalidraw` válido con ids determinísticos |
+| `excali.py` | un **mini-DSL** sin dependencias: `Diagram` con `heading`, `zone` (área de color con título e ícono), `box` (caja con texto, color, forma e ícono), `arrow` (flecha entre cajas con lado de salida/llegada, puntos intermedios y etiqueta), `note` (nota con altura automática según el texto), `text` e `icon`. Paleta fija (rellenos pastel y bordes), tipografía Helvetica y líneas limpias (nítidas en pantalla), grilla de 20 px. **Tamaño de letra:** GitHub muestra un lienzo de ~2.100 px en ~830 px, así que todo el texto se multiplica por `TEXT_SCALE` (1,5) y se mide con la tabla de anchos real de Helvetica; si un texto no entra en su caja, se achica lo justo (nunca por debajo del tamaño original). Así queda entre 11 y 16 px en pantalla. `save()` escribe un `.excalidraw` válido con ids determinísticos |
 | `generar.py` | una función por diagrama (`panorama`, `fuentes`, `ingesta`, `silver`, `gold`, `genie`, `despliegue`, `api`, `linea_de_tiempo`, `generador`, `landing`, `incremental`, `dia_incompleto`, `scd2`, `estrella`, `piramide_genie`, `operacion`, `en_numeros`, `iconos`). `en_numeros` **lee `genie/benchmarks_dev.json`**: los porcentajes del diagrama son los de la última medición |
 | `bajar_iconos.py` | baja de la biblioteca pública de Excalidraw (licencia MIT) los íconos que usan los diagramas y los guarda en `iconos.json` (sólo el dibujo, con la biblioteca de origen). Filtra marcos invisibles y calcula bien la caja de las líneas (si no, los íconos salían diminutos) |
 | `iconos.json` | los íconos (Azure, Databricks, bases de datos, personas, candados…) |
@@ -23,7 +23,7 @@ python scripts/diagramas/generar.py             # → docs/diagramas/*.excalidra
 cd scripts/diagramas && npm install && node exportar.mjs   # → *.svg
 ```
 
-**Lo que costó:** la primera versión exportaba con `@excalidraw/utils` 0.1.2 y el texto de varias líneas se
+**Lo que costó:** en la primera versión el texto se veía diminuto en GitHub (letra de 18 px en un lienzo de 2.100 px, unos 7 px en pantalla) y la letra "a mano" se emborronaba a ese tamaño: se pasó a Helvetica, texto ×1,5 con ajuste automático a la caja y trazos sin rugosidad. Antes de eso, la exportación usaba `@excalidraw/utils` 0.1.2 y el texto de varias líneas se
 superponía; se cambió a la librería del editor. Los PNG no se versionan (`.gitignore`): el SVG es el que se muestra.
 
 Los 19 diagramas están indexados en [docs/diagramas/README.md](../diagramas/README.md), con los créditos de los íconos.

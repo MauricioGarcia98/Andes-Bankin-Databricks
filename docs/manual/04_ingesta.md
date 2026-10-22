@@ -131,6 +131,9 @@ token, y `_log()` intenta tomar el **mismo** lock: un `threading.Lock` no es ree
 2. Recorre el día siguiendo el cursor, guardando los registros en un diccionario **por id** (una página repetida no
    duplica: API-05; cuenta `duplicates_seen`).
 3. Si al final hay menos que el total (API-06, página salteada), vuelve a recorrer el día, hasta 4 pasadas.
+   Si los totales dan **0**, el día todavía no se publicó (el job "día nuevo" no corrió): devuelve `ready = False` sin
+   pedir páginas. Un día "completo con 0 registros" haría avanzar el watermark y ese día no se pediría nunca más
+   (bitácora R19).
 4. Devuelve un `DayResult` con los registros, lo esperado, pasadas, páginas leídas y duplicados; `complete` es
    `len(records) == expected`.
 
@@ -150,6 +153,8 @@ token, y `_log()` intenta tomar el **mismo** lock: un `threading.Lock` no es ree
 - **Rondas de reintento (bitácora R14):** un día incompleto **no frena** la corrida. Se sigue con los demás y al final
   se vuelven a pedir los incompletos, en hasta **3 rondas con 4 minutos de espera**: como la página salteada es estable
   durante 10 minutos, reintentar enseguida da lo mismo; un rato después, no.
+- **Días no publicados:** no se escriben en bronze ni en `ops.api_reconciliation` (el quality gate no los ve como
+  incompletos), no entran en las rondas de reintento y frenan el watermark: quedan en `not_ready_days` del resumen.
 - **El watermark avanza sólo hasta el último día completo sin huecos antes.** Si el 15 quedó incompleto y el 16
   completo, el watermark queda en el 14 y la próxima corrida pide el 15 y el 16 (el 16 se reemplaza, no se duplica).
 

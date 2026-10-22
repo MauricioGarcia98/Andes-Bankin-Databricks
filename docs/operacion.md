@@ -1,6 +1,7 @@
 # Operación · Qué hacer cuando algo falla
 
-> El job `andes-bank-lakehouse` corre todos los días a las **7:00 (hora argentina)** y manda un mail si falla. Esta guía
+> Dos jobs corren solos todos los días: `andes-bank-dia-nuevo` a las **5:00** (genera y publica en Azure el día de
+> ayer) y `andes-bank-lakehouse` a las **7:00** (hora argentina). Los dos mandan un mail si fallan. Esta guía
 > dice qué mirar y qué hacer, tarea por tarea. **Regla de oro: re-correr cualquier tarea es seguro** (todas las
 > escrituras son idempotentes).
 
@@ -15,7 +16,20 @@ databricks jobs list-runs --job-id <id> --limit 1          # o en la interfaz
 databricks bundle run andes_lakehouse -t dev --only <tarea>  # re-correr sólo esa
 ```
 
-## 2. `landing_sync`
+## 2. El job `andes-bank-dia-nuevo`
+
+```sql
+SELECT * FROM andes_bank.sim.generated_days ORDER BY day DESC LIMIT 5;   -- hasta qué día está generado el banco
+```
+
+| qué ves | qué pasó | qué hacer |
+|---|---|---|
+| falla `nuevo_dia` con `AuthenticationFailed` | la SAS de escritura venció | `bash scripts/azure/02_secrets.sh` y re-correr |
+| falla a la mitad | Spark o Azure | re-correr: el día se borra y se rehace; no se duplica nada |
+| no corrió uno o más días | el job estuvo pausado o caído | correrlo una vez: genera todos los que faltan, en orden |
+| el lakehouse dice `not_ready_days` | corrió antes que el día nuevo | nada: el día se pide en la corrida siguiente |
+
+## 3. `landing_sync`
 
 ```sql
 SELECT status, count(*) FROM andes_bank.ops.landing_files
@@ -29,7 +43,7 @@ WHERE synced_at > current_date() - 1 GROUP BY ALL;
 | `CHANGED` | el sistema origen re-subió un archivo ya entregado | pedirle al origen que mande un archivo nuevo; no se re-copia |
 | `EMPTY` | llegó sólo el encabezado (ING-02) | esperar el reenvío |
 
-## 3. `bronze_api` / `bronze_crm` / `bronze_fx`
+## 4. `bronze_api` / `bronze_crm` / `bronze_fx`
 
 ```sql
 SELECT api, resultado, count(*) FROM andes_bank.semantic.v_api_llamadas
@@ -47,14 +61,14 @@ FROM andes_bank.ops.api_reconciliation GROUP BY ALL HAVING NOT completo;
 | `invalid_client` (401 en `/oauth/token`) | el client secret de la API cambió | `bash scripts/azure/02_secrets.sh` |
 | `bronze_fx` falla con timeout | la API del BCRA no respondió | re-correr; el espejo sirve de respaldo en silver |
 
-## 4. `bronze_files`
+## 5. `bronze_files`
 
 | qué ves | qué pasó | qué hacer |
 |---|---|---|
 | `UNKNOWN_FIELD_EXCEPTION` en el log | columna nueva en un archivo (schema drift) | re-correr: el esquema nuevo ya quedó guardado |
 | filas con `_rescued_data` | datos que no encajan en el contrato | mirar el archivo; si el formato cambió, contrato nuevo |
 
-## 5. `silver` / `gold`
+## 6. `silver` / `gold`
 
 ```sql
 SELECT entidad, motivo, count(*) FROM andes_bank.silver.quarantine
@@ -64,7 +78,7 @@ WHERE _quarantined_at > current_date() - 1 GROUP BY ALL;
 Un motivo nuevo en cuarentena es un formato nuevo del origen: función nueva en `silver/transforms.py`, con su ID en el
 catálogo (`docs/03`).
 
-## 6. `quality_gate`
+## 7. `quality_gate`
 
 ```sql
 SELECT regla, severidad, problema, filas_que_fallan, filas_totales
@@ -75,7 +89,7 @@ WHERE run_id = (SELECT max_by(run_id, checked_at) FROM andes_bank.semantic.v_cal
 `problema` es el ID del catálogo: `docs/03_catalogo_de_problemas.md` dice dónde se resuelve. Mientras el gate no pase,
 Genie sigue viendo los datos de la última corrida buena.
 
-## 7. El costo
+## 8. El costo
 
 ```bash
 bash scripts/azure/04_costo.sh            # gasto del mes del resource group; tope USD 10
