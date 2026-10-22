@@ -32,6 +32,8 @@ Para alguien que programa un poco (funciones de Python, un `SELECT` con `GROUP B
 
 ## Cómo está armado
 
+Antes de empezar, mirá los [diagramas](../docs/diagramas/README.md): uno por fase, para saber dónde estás parado en cada capítulo.
+
 | # | capítulo | tag al terminar | tiempo |
 |---|---|---|---|
 | 00 | este documento | — | 15 min |

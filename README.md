@@ -22,6 +22,9 @@ su misma estructura.
 | [05 · Genie](docs/05_genie.md) | Genie Agents por área, Genie One, Genie Code y para qué sirve la App |
 | [06 · Plan de construcción](docs/06_plan_de_construccion.md) | las etapas de `construir/` |
 | [07 · Posteo de LinkedIn](docs/07_posteo_linkedin.md) | las preguntas para contar el proyecto |
+| [Diagramas](docs/diagramas/README.md) | el proyecto en Excalidraw, fase por fase |
+
+![Andes Bank: el proyecto completo](docs/diagramas/00_panorama.svg)
 
 ## MVP
 

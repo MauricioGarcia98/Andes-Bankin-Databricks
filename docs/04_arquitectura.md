@@ -2,6 +2,10 @@
 
 ## Vista general
 
+![Panorama](diagramas/00_panorama.svg)
+
+Cada fase tiene su diagrama en [diagramas/](diagramas/README.md). El mismo esquema, en texto:
+
 ```
                    ┌────────────────────────── AZURE (pago por uso, tope USD 10) ─────────────────────────┐
   Generador ─────► │  Blob Storage  landing/core/...  (archivos del core)                                 │

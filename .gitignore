@@ -12,3 +12,5 @@ build/
 local.settings.json
 .python_packages/
 *.zip
+node_modules/
+docs/diagramas/*.png
