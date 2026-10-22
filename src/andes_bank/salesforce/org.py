@@ -30,8 +30,17 @@ CUSTOM_FIELDS = {
 
 
 def sf_domain(login_url: str | None) -> str:
-    """`https://login.salesforce.com` → 'login'; `https://acme-dev-ed.develop.my.salesforce.com` → 'acme-dev-ed.develop.my'."""
+    """El `domain` de simple_salesforce (el host sin `.salesforce.com`).
+
+    `https://login.salesforce.com` → 'login'; `https://acme-dev-ed.develop.my.salesforce.com` → 'acme-dev-ed.develop.my'.
+    La URL de la barra del navegador (`acme.lightning.force.com`, `acme.my.salesforce-setup.com`) es la de la interfaz,
+    no la de la API: se traduce a Mi dominio (`acme.my`).
+    """
     host = urlparse(login_url or "https://login.salesforce.com").netloc or (login_url or "")
+    host = host.lower().rstrip("/")
+    for ui in (".lightning.force.com", ".my.salesforce-setup.com"):
+        if host.endswith(ui):
+            return host.removesuffix(ui) + ".my"
     return host.removesuffix(".salesforce.com") or "login"
 
 

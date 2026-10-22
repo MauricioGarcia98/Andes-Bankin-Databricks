@@ -56,7 +56,7 @@ desde Databricks.
 4. **`SF_SECURITY_TOKEN`:** Avatar → **Configuración** → **Mi información personal → Restablecer mi token de
    seguridad**. Llega por mail, y cambia cada vez que cambiás la contraseña.
 5. **`SF_LOGIN_URL`:** `https://login.salesforce.com`. Si tu org exige su dominio propio, usá la URL de
-   *Setup → Mi dominio*.
+   *Setup → Mi dominio* (`https://<org>.my.salesforce.com`), no la de la barra del navegador (`...lightning.force.com`).
 
 Exportalas en tu terminal. **Nunca** las pegues en un chat ni en el repo:
 
@@ -187,6 +187,8 @@ En Salesforce, abrí la app *Sales* → *Cuentas*: tienen que aparecer unas 515.
 | síntoma | causa | arreglo |
 |---|---|---|
 | `INVALID_LOGIN: Invalid username, password, security token; or user locked out` | falta el token, o cambiaste la contraseña y el token viejo dejó de servir | restablecé el token y volvé a correr `01_secrets.sh` |
+| `ProxyError` o `Failed to resolve` con un host `...lightning.force.com.salesforce.com` | pusiste en `SF_LOGIN_URL` la URL del navegador | `sf_domain` ya la traduce a `<org>.my.salesforce.com`; si igual falla, usá esa URL directamente (R15) |
+| ¿Es la contraseña o el token? | `INVALID_LOGIN` no dice cuál | probá **sin** token: si la respuesta pasa a `LOGIN_MUST_USE_SECURITY_TOKEN`, usuario y contraseña están bien y el problema es el token (R16) |
 | No aparece "Restablecer mi token de seguridad" | tu perfil tiene rangos de IP de inicio de sesión | *Setup → Perfiles → Administrador del sistema → Rangos de IP* (borralos) o usá una org nueva |
 | `No such column 'Andes_Key__c' on entity 'Account'` | el campo existe pero no tenés permiso (FLS) | `prepare_org` crea y asigna el permission set; si lo creaste a mano, asignátelo |
 | `DUPLICATE_VALUE` en `Andes_Key__c` | el campo se creó sin *Unique* o hay dos registros con la misma clave | revisá `EXTERNAL_KEY` en `org.py` |
